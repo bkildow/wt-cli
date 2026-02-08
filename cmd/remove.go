@@ -1,0 +1,116 @@
+package cmd
+
+import (
+	"fmt"
+	"os"
+
+	"github.com/briankildow/wt-cli/internal/config"
+	"github.com/briankildow/wt-cli/internal/git"
+	"github.com/briankildow/wt-cli/internal/project"
+	"github.com/briankildow/wt-cli/internal/ui"
+	"github.com/spf13/cobra"
+)
+
+func newRemoveCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "remove [name]",
+		Short: "Remove a worktree and its branch",
+		Args:  cobra.MaximumNArgs(1),
+		RunE:  runRemove,
+	}
+	cmd.Flags().Bool("force", false, "Remove even if worktree has uncommitted changes")
+	return cmd
+}
+
+func runRemove(cmd *cobra.Command, args []string) error {
+	ctx := cmd.Context()
+
+	cwd, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+
+	projectRoot, err := project.FindRoot(cwd)
+	if err != nil {
+		return err
+	}
+
+	cfg, err := config.Load(projectRoot)
+	if err != nil {
+		return err
+	}
+
+	runner := git.NewRunner(project.GitDirPath(projectRoot, cfg), IsDryRun())
+
+	worktrees, err := runner.WorktreeList(ctx)
+	if err != nil {
+		return err
+	}
+
+	// Filter out bare entries
+	var filtered []git.WorktreeInfo
+	for _, wt := range worktrees {
+		if !wt.Bare {
+			filtered = append(filtered, wt)
+		}
+	}
+
+	if len(filtered) == 0 {
+		return fmt.Errorf("no worktrees found")
+	}
+
+	var selected git.WorktreeInfo
+	if len(args) > 0 {
+		found := false
+		for _, wt := range filtered {
+			if wt.Branch == args[0] {
+				selected = wt
+				found = true
+				break
+			}
+		}
+		if !found {
+			return fmt.Errorf("worktree not found: %s", args[0])
+		}
+	} else {
+		names := make([]string, len(filtered))
+		for i, wt := range filtered {
+			names[i] = wt.Branch
+		}
+		prompter := &ui.InteractivePrompter{}
+		name, err := prompter.SelectWorktree(names)
+		if err != nil {
+			return err
+		}
+		for _, wt := range filtered {
+			if wt.Branch == name {
+				selected = wt
+				break
+			}
+		}
+	}
+
+	force, _ := cmd.Flags().GetBool("force")
+
+	if !force {
+		dirty, err := runner.IsWorktreeDirty(ctx, selected.Path)
+		if err != nil {
+			return err
+		}
+		if dirty {
+			return fmt.Errorf("worktree has uncommitted changes (use --force to override)")
+		}
+	}
+
+	ui.Step("Removing worktree: " + selected.Branch)
+	if err := runner.WorktreeRemove(ctx, selected.Path, force); err != nil {
+		return err
+	}
+
+	if err := runner.BranchDelete(ctx, selected.Branch, false); err != nil {
+		ui.Warning("Could not delete branch: " + err.Error())
+	}
+
+	ui.Success("Removed worktree: " + selected.Branch)
+	return nil
+}

@@ -118,6 +118,83 @@ func TestDryRunMode(t *testing.T) {
 	if err := runner.Fetch(ctx, "origin"); err != nil {
 		t.Errorf("dry-run Fetch returned error: %v", err)
 	}
+
+	// HasRemoteBranch (dry-run returns false since ListRemoteBranches returns empty)
+	hasBranch, err := runner.HasRemoteBranch(ctx, "main")
+	if err != nil {
+		t.Errorf("dry-run HasRemoteBranch returned error: %v", err)
+	}
+	if hasBranch {
+		t.Errorf("dry-run HasRemoteBranch should return false")
+	}
+
+	// WorktreeAddNew
+	if err := runner.WorktreeAddNew(ctx, "/tmp/wt", "feature-x"); err != nil {
+		t.Errorf("dry-run WorktreeAddNew returned error: %v", err)
+	}
+
+	// WorktreeRemove
+	if err := runner.WorktreeRemove(ctx, "/tmp/wt", false); err != nil {
+		t.Errorf("dry-run WorktreeRemove returned error: %v", err)
+	}
+	if err := runner.WorktreeRemove(ctx, "/tmp/wt", true); err != nil {
+		t.Errorf("dry-run WorktreeRemove (force) returned error: %v", err)
+	}
+
+	// BranchDelete
+	if err := runner.BranchDelete(ctx, "old-branch", false); err != nil {
+		t.Errorf("dry-run BranchDelete returned error: %v", err)
+	}
+	if err := runner.BranchDelete(ctx, "old-branch", true); err != nil {
+		t.Errorf("dry-run BranchDelete (force) returned error: %v", err)
+	}
+
+	// IsWorktreeDirty
+	dirty, err := runner.IsWorktreeDirty(ctx, "/tmp/wt")
+	if err != nil {
+		t.Errorf("dry-run IsWorktreeDirty returned error: %v", err)
+	}
+	if dirty {
+		t.Errorf("dry-run IsWorktreeDirty should return false")
+	}
+}
+
+func TestParseDirtyStatus(t *testing.T) {
+	tests := []struct {
+		name   string
+		input  string
+		expect bool
+	}{
+		{
+			name:   "empty string",
+			input:  "",
+			expect: false,
+		},
+		{
+			name:   "whitespace only",
+			input:  "   \n\t\n  ",
+			expect: false,
+		},
+		{
+			name:   "single modified file",
+			input:  " M cmd/root.go\n",
+			expect: true,
+		},
+		{
+			name:   "multiple files",
+			input:  " M cmd/root.go\n?? newfile.txt\nA  added.go\n",
+			expect: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := parseDirtyStatus(tt.input)
+			if got != tt.expect {
+				t.Errorf("parseDirtyStatus(%q) = %v, want %v", tt.input, got, tt.expect)
+			}
+		})
+	}
 }
 
 func TestIntegrationCloneAndWorktree(t *testing.T) {

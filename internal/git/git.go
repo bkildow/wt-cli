@@ -23,8 +23,13 @@ type Git interface {
 	ConfigureRemoteFetch(ctx context.Context) error
 	Fetch(ctx context.Context, remote string) error
 	ListRemoteBranches(ctx context.Context) ([]string, error)
+	HasRemoteBranch(ctx context.Context, branch string) (bool, error)
 	WorktreeAdd(ctx context.Context, path, branch string) error
+	WorktreeAddNew(ctx context.Context, path, branch string) error
+	WorktreeRemove(ctx context.Context, path string, force bool) error
 	WorktreeList(ctx context.Context) ([]WorktreeInfo, error)
+	BranchDelete(ctx context.Context, branch string, force bool) error
+	IsWorktreeDirty(ctx context.Context, worktreePath string) (bool, error)
 }
 
 type Runner struct {
@@ -121,8 +126,35 @@ func parseRemoteBranches(output string) []string {
 	return branches
 }
 
+func (r *Runner) HasRemoteBranch(ctx context.Context, branch string) (bool, error) {
+	branches, err := r.ListRemoteBranches(ctx)
+	if err != nil {
+		return false, err
+	}
+	for _, b := range branches {
+		if b == branch {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 func (r *Runner) WorktreeAdd(ctx context.Context, path, branch string) error {
 	_, err := r.Run(ctx, "worktree", "add", path, branch)
+	return err
+}
+
+func (r *Runner) WorktreeAddNew(ctx context.Context, path, branch string) error {
+	_, err := r.Run(ctx, "worktree", "add", "-b", branch, path, "HEAD")
+	return err
+}
+
+func (r *Runner) WorktreeRemove(ctx context.Context, path string, force bool) error {
+	args := []string{"worktree", "remove", path}
+	if force {
+		args = append(args, "--force")
+	}
+	_, err := r.Run(ctx, args...)
 	return err
 }
 
@@ -169,4 +201,39 @@ func parseWorktreeList(output string) []WorktreeInfo {
 	}
 
 	return worktrees
+}
+
+func (r *Runner) BranchDelete(ctx context.Context, branch string, force bool) error {
+	flag := "-d"
+	if force {
+		flag = "-D"
+	}
+	_, err := r.Run(ctx, "branch", flag, branch)
+	return err
+}
+
+func (r *Runner) IsWorktreeDirty(ctx context.Context, worktreePath string) (bool, error) {
+	args := []string{"-C", worktreePath, "status", "--porcelain"}
+	cmdStr := "git " + strings.Join(args, " ")
+
+	if r.DryRun {
+		ui.DryRunNotice(cmdStr)
+		return false, nil
+	}
+
+	ui.Command(cmdStr)
+	cmd := exec.CommandContext(ctx, "git", args...)
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	if err := cmd.Run(); err != nil {
+		return false, fmt.Errorf("%s: %w\n%s", cmdStr, err, stderr.String())
+	}
+
+	return parseDirtyStatus(stdout.String()), nil
+}
+
+func parseDirtyStatus(output string) bool {
+	return strings.TrimSpace(output) != ""
 }

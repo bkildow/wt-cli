@@ -4,6 +4,7 @@ import "github.com/charmbracelet/huh"
 
 type Prompter interface {
 	SelectBranch(branches []string) (string, error)
+	SelectWorktree(worktrees []string) (string, error)
 	Confirm(title string) (bool, error)
 	InputString(title, placeholder string) (string, error)
 }
@@ -19,6 +20,23 @@ func (p *InteractivePrompter) SelectBranch(branches []string) (string, error) {
 
 	err := huh.NewSelect[string]().
 		Title("Select a branch").
+		Options(opts...).
+		Height(15).
+		Value(&selected).
+		Run()
+
+	return selected, err
+}
+
+func (p *InteractivePrompter) SelectWorktree(worktrees []string) (string, error) {
+	var selected string
+	opts := make([]huh.Option[string], len(worktrees))
+	for i, w := range worktrees {
+		opts[i] = huh.NewOption(w, w)
+	}
+
+	err := huh.NewSelect[string]().
+		Title("Select a worktree").
 		Options(opts...).
 		Height(15).
 		Value(&selected).
