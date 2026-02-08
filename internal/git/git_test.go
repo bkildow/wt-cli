@@ -157,6 +157,53 @@ func TestDryRunMode(t *testing.T) {
 	if dirty {
 		t.Errorf("dry-run IsWorktreeDirty should return false")
 	}
+
+	// IsBranchMerged
+	merged, err := runner.IsBranchMerged(ctx, "feature", "main")
+	if err != nil {
+		t.Errorf("dry-run IsBranchMerged returned error: %v", err)
+	}
+	if !merged {
+		t.Errorf("dry-run IsBranchMerged should return true")
+	}
+
+	// FetchAll
+	if err := runner.FetchAll(ctx); err != nil {
+		t.Errorf("dry-run FetchAll returned error: %v", err)
+	}
+
+	// WorktreePrune
+	if err := runner.WorktreePrune(ctx); err != nil {
+		t.Errorf("dry-run WorktreePrune returned error: %v", err)
+	}
+
+	// GetLastCommitAge
+	age, err := runner.GetLastCommitAge(ctx, "/tmp/wt")
+	if err != nil {
+		t.Errorf("dry-run GetLastCommitAge returned error: %v", err)
+	}
+	if age != "unknown" {
+		t.Errorf("dry-run GetLastCommitAge = %q, want %q", age, "unknown")
+	}
+
+	// GetBehindCount
+	behind, err := runner.GetBehindCount(ctx, "/tmp/wt")
+	if err != nil {
+		t.Errorf("dry-run GetBehindCount returned error: %v", err)
+	}
+	if behind != 0 {
+		t.Errorf("dry-run GetBehindCount = %d, want 0", behind)
+	}
+
+	// Pull
+	if err := runner.Pull(ctx, "/tmp/wt"); err != nil {
+		t.Errorf("dry-run Pull returned error: %v", err)
+	}
+
+	// PullRebase
+	if err := runner.PullRebase(ctx, "/tmp/wt"); err != nil {
+		t.Errorf("dry-run PullRebase returned error: %v", err)
+	}
 }
 
 func TestParseDirtyStatus(t *testing.T) {
@@ -192,6 +239,125 @@ func TestParseDirtyStatus(t *testing.T) {
 			got := parseDirtyStatus(tt.input)
 			if got != tt.expect {
 				t.Errorf("parseDirtyStatus(%q) = %v, want %v", tt.input, got, tt.expect)
+			}
+		})
+	}
+}
+
+func TestParseDefaultBranch(t *testing.T) {
+	tests := []struct {
+		name   string
+		input  string
+		expect string
+	}{
+		{
+			name:   "full ref",
+			input:  "refs/remotes/origin/main",
+			expect: "main",
+		},
+		{
+			name:   "with trailing newline",
+			input:  "refs/remotes/origin/develop\n",
+			expect: "develop",
+		},
+		{
+			name:   "already short",
+			input:  "main",
+			expect: "main",
+		},
+		{
+			name:   "empty",
+			input:  "",
+			expect: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := parseDefaultBranch(tt.input)
+			if got != tt.expect {
+				t.Errorf("parseDefaultBranch(%q) = %q, want %q", tt.input, got, tt.expect)
+			}
+		})
+	}
+}
+
+func TestParseBranchList(t *testing.T) {
+	tests := []struct {
+		name   string
+		input  string
+		expect []string
+	}{
+		{
+			name:   "typical output",
+			input:  "  main\n  develop\n  feature/login",
+			expect: []string{"main", "develop", "feature/login"},
+		},
+		{
+			name:   "with current branch marker",
+			input:  "* main\n  develop\n  feature/login",
+			expect: []string{"main", "develop", "feature/login"},
+		},
+		{
+			name:   "empty",
+			input:  "",
+			expect: nil,
+		},
+		{
+			name:   "single branch",
+			input:  "* main",
+			expect: []string{"main"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := parseBranchList(tt.input)
+			if len(got) != len(tt.expect) {
+				t.Fatalf("parseBranchList(%q) got %v, want %v", tt.input, got, tt.expect)
+			}
+			for i := range got {
+				if got[i] != tt.expect[i] {
+					t.Errorf("branch[%d] = %q, want %q", i, got[i], tt.expect[i])
+				}
+			}
+		})
+	}
+}
+
+func TestParseBehindCount(t *testing.T) {
+	tests := []struct {
+		name   string
+		input  string
+		expect int
+	}{
+		{
+			name:   "zero",
+			input:  "0\n",
+			expect: 0,
+		},
+		{
+			name:   "positive",
+			input:  "5\n",
+			expect: 5,
+		},
+		{
+			name:   "invalid",
+			input:  "not a number",
+			expect: 0,
+		},
+		{
+			name:   "empty",
+			input:  "",
+			expect: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := parseBehindCount(tt.input)
+			if got != tt.expect {
+				t.Errorf("parseBehindCount(%q) = %d, want %d", tt.input, got, tt.expect)
 			}
 		})
 	}

@@ -13,10 +13,11 @@ import (
 
 func newApplyCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "apply [name]",
-		Short: "Apply shared files to a worktree",
-		Args:  cobra.MaximumNArgs(1),
-		RunE:  runApply,
+		Use:               "apply [name]",
+		Short:             "Apply shared files to a worktree",
+		Args:              cobra.MaximumNArgs(1),
+		ValidArgsFunction: completeWorktreeNames,
+		RunE:              runApply,
 	}
 	cmd.Flags().Bool("all", false, "Apply to all worktrees")
 	return cmd
@@ -65,7 +66,8 @@ func runApply(cmd *cobra.Command, args []string) error {
 	if all {
 		for _, wt := range filtered {
 			ui.Step("Applying to: " + wt.Branch)
-			if err := project.Apply(projectRoot, wt.Path, dry); err != nil {
+			vars := project.NewTemplateVars(wt.Path, wt.Branch)
+			if err := project.Apply(projectRoot, wt.Path, dry, &vars); err != nil {
 				return err
 			}
 		}
@@ -104,7 +106,8 @@ func runApply(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	if err := project.Apply(projectRoot, selected.Path, dry); err != nil {
+	vars := project.NewTemplateVars(selected.Path, selected.Branch)
+	if err := project.Apply(projectRoot, selected.Path, dry, &vars); err != nil {
 		return err
 	}
 

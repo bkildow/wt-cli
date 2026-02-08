@@ -52,8 +52,13 @@ func runInit(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	ui.Step("Writing " + config.ConfigFileName)
 	cfg := config.DefaultConfig()
+	cfg.ProjectType = project.DetectProjectType(cwd)
+	if cfg.ProjectType != "generic" {
+		ui.Info("Detected project type: " + cfg.ProjectType)
+	}
+
+	ui.Step("Writing " + config.ConfigFileName)
 	if dry {
 		ui.DryRunNotice("write " + filepath.Join(cwd, config.ConfigFileName))
 	} else {

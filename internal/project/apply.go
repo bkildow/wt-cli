@@ -10,9 +10,7 @@ import (
 	"github.com/briankildow/wt-cli/internal/ui"
 )
 
-// ApplyCopy walks shared/copy/ and copies each file into the worktree,
-// preserving directory structure and file permissions.
-func ApplyCopy(projectRoot, worktreePath string, dryRun bool) error {
+func ApplyCopy(projectRoot, worktreePath string, dryRun bool, vars *TemplateVars) error {
 	copyDir := filepath.Join(projectRoot, "shared", "copy")
 
 	if _, err := os.Stat(copyDir); os.IsNotExist(err) {
@@ -42,6 +40,28 @@ func ApplyCopy(projectRoot, worktreePath string, dryRun bool) error {
 
 		if err := os.MkdirAll(filepath.Dir(dest), 0755); err != nil {
 			return err
+		}
+
+		if vars != nil {
+			bin, err := isBinaryFile(path)
+			if err != nil {
+				return err
+			}
+			if !bin {
+				content, err := os.ReadFile(path)
+				if err != nil {
+					return err
+				}
+				if HasTemplateVars(string(content)) {
+					srcInfo, err := os.Stat(path)
+					if err != nil {
+						return err
+					}
+					processed := ProcessTemplate(string(content), *vars)
+					ui.Info(fmt.Sprintf("  substituted template variables in %s", rel))
+					return os.WriteFile(dest, []byte(processed), srcInfo.Mode())
+				}
+			}
 		}
 
 		return copyFile(path, dest)
@@ -84,9 +104,8 @@ func ApplySymlinks(projectRoot, worktreePath string, dryRun bool) error {
 	return nil
 }
 
-// Apply runs ApplyCopy then ApplySymlinks, returning the first error.
-func Apply(projectRoot, worktreePath string, dryRun bool) error {
-	if err := ApplyCopy(projectRoot, worktreePath, dryRun); err != nil {
+func Apply(projectRoot, worktreePath string, dryRun bool, vars *TemplateVars) error {
+	if err := ApplyCopy(projectRoot, worktreePath, dryRun, vars); err != nil {
 		return err
 	}
 	return ApplySymlinks(projectRoot, worktreePath, dryRun)

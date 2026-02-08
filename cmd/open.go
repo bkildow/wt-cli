@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"os/exec"
 
 	"github.com/briankildow/wt-cli/internal/config"
 	"github.com/briankildow/wt-cli/internal/git"
@@ -11,19 +12,28 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func newRemoveCmd() *cobra.Command {
+var knownEditors = []struct{ Name, Binary string }{
+	{"Cursor", "cursor"},
+	{"VS Code", "code"},
+	{"Zed", "zed"},
+}
+
+func newOpenCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:               "remove [name]",
-		Short:             "Remove a worktree and its branch",
+		Use:               "open [name]",
+		Short:             "Open a worktree in an IDE",
 		Args:              cobra.MaximumNArgs(1),
 		ValidArgsFunction: completeWorktreeNames,
-		RunE:              runRemove,
+		RunE:              runOpen,
 	}
-	cmd.Flags().Bool("force", false, "Remove even if worktree has uncommitted changes")
+	cmd.Flags().Bool("cursor", false, "Open in Cursor")
+	cmd.Flags().Bool("code", false, "Open in VS Code")
+	cmd.Flags().Bool("zed", false, "Open in Zed")
+	cmd.MarkFlagsMutuallyExclusive("cursor", "code", "zed")
 	return cmd
 }
 
-func runRemove(cmd *cobra.Command, args []string) error {
+func runOpen(cmd *cobra.Command, args []string) error {
 	ctx := cmd.Context()
 
 	cwd, err := os.Getwd()
@@ -42,13 +52,11 @@ func runRemove(cmd *cobra.Command, args []string) error {
 	}
 
 	runner := git.NewRunner(project.GitDirPath(projectRoot, cfg), IsDryRun())
-
 	worktrees, err := runner.WorktreeList(ctx)
 	if err != nil {
 		return err
 	}
 
-	// Filter out bare entries
 	var filtered []git.WorktreeInfo
 	for _, wt := range worktrees {
 		if !wt.Bare {
@@ -91,27 +99,46 @@ func runRemove(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	force, _ := cmd.Flags().GetBool("force")
+	// Determine editor
+	var editorBinary string
 
-	if !force {
-		dirty, err := runner.IsWorktreeDirty(ctx, selected.Path)
-		if err != nil {
-			return err
+	// Check flags first
+	for _, e := range knownEditors {
+		flagSet, _ := cmd.Flags().GetBool(e.Binary)
+		if flagSet {
+			editorBinary = e.Binary
+			break
 		}
-		if dirty {
-			return fmt.Errorf("worktree has uncommitted changes (use --force to override)")
+	}
+
+	// Auto-detect if no flag set
+	if editorBinary == "" {
+		var available []string
+		for _, e := range knownEditors {
+			if _, err := exec.LookPath(e.Binary); err == nil {
+				available = append(available, e.Binary)
+			}
+		}
+
+		switch len(available) {
+		case 0:
+			return fmt.Errorf("no supported editor found (install cursor, code, or zed)")
+		case 1:
+			editorBinary = available[0]
+		default:
+			prompter := &ui.InteractivePrompter{}
+			editorBinary, err = prompter.SelectEditor(available)
+			if err != nil {
+				return err
+			}
 		}
 	}
 
-	ui.Step("Removing worktree: " + selected.Branch)
-	if err := runner.WorktreeRemove(ctx, selected.Path, force); err != nil {
-		return err
+	if IsDryRun() {
+		ui.DryRunNotice(fmt.Sprintf("%s %s", editorBinary, selected.Path))
+		return nil
 	}
 
-	if err := runner.BranchDelete(ctx, selected.Branch, false); err != nil {
-		ui.Warning("Could not delete branch: " + err.Error())
-	}
-
-	ui.Success("Removed worktree: " + selected.Branch)
-	return nil
+	ui.Step(fmt.Sprintf("Opening %s in %s", selected.Branch, editorBinary))
+	return exec.Command(editorBinary, selected.Path).Start()
 }

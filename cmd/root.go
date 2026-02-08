@@ -23,6 +23,11 @@ func init() {
 	rootCmd.AddCommand(newCdCmd())
 	rootCmd.AddCommand(newApplyCmd())
 	rootCmd.AddCommand(newInitCmd())
+	rootCmd.AddCommand(newCompletionCmd())
+	rootCmd.AddCommand(newOpenCmd())
+	rootCmd.AddCommand(newStatusCmd())
+	rootCmd.AddCommand(newSyncCmd())
+	rootCmd.AddCommand(newPruneCmd())
 }
 
 func Execute() error {

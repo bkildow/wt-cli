@@ -22,7 +22,7 @@ func TestApplyCopy(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := ApplyCopy(root, wt, false); err != nil {
+	if err := ApplyCopy(root, wt, false, nil); err != nil {
 		t.Fatalf("ApplyCopy error: %v", err)
 	}
 
@@ -56,7 +56,7 @@ func TestApplyCopyDryRun(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := ApplyCopy(root, wt, true); err != nil {
+	if err := ApplyCopy(root, wt, true, nil); err != nil {
 		t.Fatalf("ApplyCopy dry-run error: %v", err)
 	}
 
@@ -69,7 +69,7 @@ func TestApplyCopyMissingSharedDir(t *testing.T) {
 	root := t.TempDir()
 	wt := t.TempDir()
 
-	if err := ApplyCopy(root, wt, false); err != nil {
+	if err := ApplyCopy(root, wt, false, nil); err != nil {
 		t.Fatalf("ApplyCopy with missing dir should not error: %v", err)
 	}
 }
@@ -144,7 +144,7 @@ func TestApply(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := Apply(root, wt, false); err != nil {
+	if err := Apply(root, wt, false, nil); err != nil {
 		t.Fatalf("Apply error: %v", err)
 	}
 
@@ -156,5 +156,61 @@ func TestApply(t *testing.T) {
 	// Verify symlink
 	if _, err := os.Lstat(filepath.Join(wt, "vendor")); err != nil {
 		t.Error("Apply did not create vendor symlink")
+	}
+}
+
+func TestApplyCopyWithTemplateVars(t *testing.T) {
+	root := t.TempDir()
+	wt := t.TempDir()
+
+	copyDir := filepath.Join(root, "shared", "copy")
+	if err := os.MkdirAll(copyDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	content := "db: ${DATABASE_NAME}\nname: ${WORKTREE_NAME}\n"
+	if err := os.WriteFile(filepath.Join(copyDir, "config.yml"), []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	vars := NewTemplateVars(wt, "feature/login")
+	if err := ApplyCopy(root, wt, false, &vars); err != nil {
+		t.Fatalf("ApplyCopy with vars error: %v", err)
+	}
+
+	got, err := os.ReadFile(filepath.Join(wt, "config.yml"))
+	if err != nil {
+		t.Fatalf("config.yml not created: %v", err)
+	}
+	want := "db: feature_login\nname: feature-login\n"
+	if string(got) != want {
+		t.Errorf("config.yml content = %q, want %q", got, want)
+	}
+}
+
+func TestApplyCopyBinaryFileSkipsTemplate(t *testing.T) {
+	root := t.TempDir()
+	wt := t.TempDir()
+
+	copyDir := filepath.Join(root, "shared", "copy")
+	if err := os.MkdirAll(copyDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	content := []byte("${WORKTREE_NAME}")
+	content = append(content, 0x00)
+	if err := os.WriteFile(filepath.Join(copyDir, "image.bin"), content, 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	vars := NewTemplateVars(wt, "feature/login")
+	if err := ApplyCopy(root, wt, false, &vars); err != nil {
+		t.Fatalf("ApplyCopy binary error: %v", err)
+	}
+
+	got, err := os.ReadFile(filepath.Join(wt, "image.bin"))
+	if err != nil {
+		t.Fatalf("image.bin not created: %v", err)
+	}
+	if string(got) != string(content) {
+		t.Errorf("binary file was modified, want literal preservation")
 	}
 }

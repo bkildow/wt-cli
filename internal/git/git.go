@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"os/exec"
+	"strconv"
 	"strings"
 
 	"github.com/briankildow/wt-cli/internal/ui"
@@ -28,8 +29,16 @@ type Git interface {
 	WorktreeAddNew(ctx context.Context, path, branch string) error
 	WorktreeRemove(ctx context.Context, path string, force bool) error
 	WorktreeList(ctx context.Context) ([]WorktreeInfo, error)
+	WorktreePrune(ctx context.Context) error
 	BranchDelete(ctx context.Context, branch string, force bool) error
 	IsWorktreeDirty(ctx context.Context, worktreePath string) (bool, error)
+	IsBranchMerged(ctx context.Context, branch, target string) (bool, error)
+	FetchAll(ctx context.Context) error
+	GetDefaultBranch(ctx context.Context) (string, error)
+	GetLastCommitAge(ctx context.Context, worktreePath string) (string, error)
+	GetBehindCount(ctx context.Context, worktreePath string) (int, error)
+	Pull(ctx context.Context, worktreePath string) error
+	PullRebase(ctx context.Context, worktreePath string) error
 }
 
 type Runner struct {
@@ -236,4 +245,178 @@ func (r *Runner) IsWorktreeDirty(ctx context.Context, worktreePath string) (bool
 
 func parseDirtyStatus(output string) bool {
 	return strings.TrimSpace(output) != ""
+}
+
+func (r *Runner) IsBranchMerged(ctx context.Context, branch, target string) (bool, error) {
+	args := []string{"--git-dir", r.GitDir, "merge-base", "--is-ancestor", branch, target}
+	cmdStr := "git " + strings.Join(args, " ")
+
+	if r.DryRun {
+		ui.DryRunNotice(cmdStr)
+		return true, nil
+	}
+
+	ui.Command(cmdStr)
+	cmd := exec.CommandContext(ctx, "git", args...)
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+
+	if err := cmd.Run(); err != nil {
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			if exitErr.ExitCode() == 1 {
+				return false, nil
+			}
+		}
+		return false, fmt.Errorf("%s: %w\n%s", cmdStr, err, stderr.String())
+	}
+
+	return true, nil
+}
+
+func (r *Runner) FetchAll(ctx context.Context) error {
+	_, err := r.Run(ctx, "fetch", "--all")
+	return err
+}
+
+func (r *Runner) GetDefaultBranch(ctx context.Context) (string, error) {
+	output, err := r.Run(ctx, "symbolic-ref", "refs/remotes/origin/HEAD")
+	if err == nil {
+		return parseDefaultBranch(output), nil
+	}
+
+	if _, err := r.Run(ctx, "show-ref", "--verify", "--quiet", "refs/heads/main"); err == nil {
+		return "main", nil
+	}
+
+	if _, err := r.Run(ctx, "show-ref", "--verify", "--quiet", "refs/heads/master"); err == nil {
+		return "master", nil
+	}
+
+	return "", fmt.Errorf("could not determine default branch")
+}
+
+func (r *Runner) WorktreePrune(ctx context.Context) error {
+	_, err := r.Run(ctx, "worktree", "prune")
+	return err
+}
+
+func (r *Runner) GetLastCommitAge(ctx context.Context, worktreePath string) (string, error) {
+	args := []string{"-C", worktreePath, "log", "-1", "--format=%cr"}
+	cmdStr := "git " + strings.Join(args, " ")
+
+	if r.DryRun {
+		ui.DryRunNotice(cmdStr)
+		return "unknown", nil
+	}
+
+	ui.Command(cmdStr)
+	cmd := exec.CommandContext(ctx, "git", args...)
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	if err := cmd.Run(); err != nil {
+		return "", fmt.Errorf("%s: %w\n%s", cmdStr, err, stderr.String())
+	}
+
+	return strings.TrimSpace(stdout.String()), nil
+}
+
+func (r *Runner) GetBehindCount(ctx context.Context, worktreePath string) (int, error) {
+	args := []string{"-C", worktreePath, "rev-list", "--count", "HEAD..@{upstream}"}
+	cmdStr := "git " + strings.Join(args, " ")
+
+	if r.DryRun {
+		ui.DryRunNotice(cmdStr)
+		return 0, nil
+	}
+
+	ui.Command(cmdStr)
+	cmd := exec.CommandContext(ctx, "git", args...)
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	if err := cmd.Run(); err != nil {
+		stderrStr := stderr.String()
+		if strings.Contains(stderrStr, "no upstream") || strings.Contains(stderrStr, "unknown revision") {
+			return 0, nil
+		}
+		return 0, fmt.Errorf("%s: %w\n%s", cmdStr, err, stderrStr)
+	}
+
+	return parseBehindCount(stdout.String()), nil
+}
+
+func (r *Runner) Pull(ctx context.Context, worktreePath string) error {
+	args := []string{"-C", worktreePath, "pull"}
+	cmdStr := "git " + strings.Join(args, " ")
+
+	if r.DryRun {
+		ui.DryRunNotice(cmdStr)
+		return nil
+	}
+
+	ui.Command(cmdStr)
+	cmd := exec.CommandContext(ctx, "git", args...)
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("%s: %w\n%s", cmdStr, err, stderr.String())
+	}
+
+	return nil
+}
+
+func (r *Runner) PullRebase(ctx context.Context, worktreePath string) error {
+	args := []string{"-C", worktreePath, "pull", "--rebase"}
+	cmdStr := "git " + strings.Join(args, " ")
+
+	if r.DryRun {
+		ui.DryRunNotice(cmdStr)
+		return nil
+	}
+
+	ui.Command(cmdStr)
+	cmd := exec.CommandContext(ctx, "git", args...)
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("%s: %w\n%s", cmdStr, err, stderr.String())
+	}
+
+	return nil
+}
+
+func parseDefaultBranch(output string) string {
+	s := strings.TrimSpace(output)
+	return strings.TrimPrefix(s, "refs/remotes/origin/")
+}
+
+func parseBranchList(output string) []string {
+	if output == "" {
+		return nil
+	}
+
+	var branches []string
+	for _, line := range strings.Split(output, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		line = strings.TrimPrefix(line, "* ")
+		branches = append(branches, line)
+	}
+
+	return branches
+}
+
+func parseBehindCount(output string) int {
+	n, err := strconv.Atoi(strings.TrimSpace(output))
+	if err != nil {
+		return 0
+	}
+	return n
 }

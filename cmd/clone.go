@@ -78,9 +78,15 @@ func runClone(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	// Save default config
-	ui.Step("Writing " + config.ConfigFileName)
+	// Detect project type
 	cfg := config.DefaultConfig()
+	cfg.ProjectType = project.DetectProjectType(projectRoot)
+	if cfg.ProjectType != "generic" {
+		ui.Info("Detected project type: " + cfg.ProjectType)
+	}
+
+	// Save config
+	ui.Step("Writing " + config.ConfigFileName)
 	if dry {
 		ui.DryRunNotice("write " + filepath.Join(projectRoot, config.ConfigFileName))
 	} else {
