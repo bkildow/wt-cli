@@ -5,7 +5,21 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Build & Test Commands
 
 ```bash
-go build -o wt .                          # Build binary
+make                # Build binary (equivalent to: go build -o wt ./cmd/wt)
+make test           # Run all tests
+make test-short     # Skip integration tests
+make vet            # Lint
+make fmt            # Format code
+make dev            # fmt + vet + test + build
+make clean          # Remove built binary
+make install        # Install to $GOBIN as "wt"
+```
+
+Raw `go` commands for reference:
+
+```bash
+go build -o wt ./cmd/wt                   # Build binary
+go install ./cmd/wt                       # Install to $GOBIN as "wt"
 go test ./...                             # Run all tests
 go test ./internal/git/                   # Run tests for a single package
 go test ./internal/git/ -run TestDryRun   # Run a specific test
