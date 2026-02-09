@@ -26,10 +26,6 @@ func newOpenCmd() *cobra.Command {
 		ValidArgsFunction: completeWorktreeNames,
 		RunE:              runOpen,
 	}
-	cmd.Flags().Bool("cursor", false, "Open in Cursor")
-	cmd.Flags().Bool("code", false, "Open in VS Code")
-	cmd.Flags().Bool("zed", false, "Open in Zed")
-	cmd.MarkFlagsMutuallyExclusive("cursor", "code", "zed")
 	return cmd
 }
 
@@ -99,19 +95,28 @@ func runOpen(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	// Determine editor
+	// Determine editor: config > $EDITOR > auto-detect
 	var editorBinary string
 
-	// Check flags first
-	for _, e := range knownEditors {
-		flagSet, _ := cmd.Flags().GetBool(e.Binary)
-		if flagSet {
-			editorBinary = e.Binary
-			break
+	// 1. Config file
+	if cfg.Editor != "" {
+		if _, err := exec.LookPath(cfg.Editor); err != nil {
+			return fmt.Errorf("configured editor not found: %s", cfg.Editor)
+		}
+		editorBinary = cfg.Editor
+	}
+
+	// 2. $EDITOR environment variable
+	if editorBinary == "" {
+		if env := os.Getenv("EDITOR"); env != "" {
+			if _, err := exec.LookPath(env); err != nil {
+				return fmt.Errorf("$EDITOR not found: %s", env)
+			}
+			editorBinary = env
 		}
 	}
 
-	// Auto-detect if no flag set
+	// 3. Auto-detect known editors
 	if editorBinary == "" {
 		var available []string
 		for _, e := range knownEditors {
@@ -119,10 +124,9 @@ func runOpen(cmd *cobra.Command, args []string) error {
 				available = append(available, e.Binary)
 			}
 		}
-
 		switch len(available) {
 		case 0:
-			return fmt.Errorf("no supported editor found (install cursor, code, or zed)")
+			return fmt.Errorf("no editor found: set 'editor' in .worktree.yml or $EDITOR")
 		case 1:
 			editorBinary = available[0]
 		default:

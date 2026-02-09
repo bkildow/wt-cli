@@ -92,7 +92,7 @@ func runAdd(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	if err := project.RunPostCreateHooks(ctx, cfg, worktreePath, dry); err != nil {
+	if err := project.RunSetupHooks(ctx, cfg, worktreePath, dry); err != nil {
 		return err
 	}
 

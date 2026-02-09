@@ -7,60 +7,94 @@ import (
 	"github.com/briankildow/wt-cli/internal/config"
 )
 
-func TestRunPostCreateHooks(t *testing.T) {
+func TestRunSetupHooks(t *testing.T) {
 	cfg := &config.Config{
-		PostCreate: []string{"echo hello"},
+		Setup: []string{"echo hello"},
 	}
 	wt := t.TempDir()
 
-	err := RunPostCreateHooks(context.Background(), cfg, wt, false)
+	err := RunSetupHooks(context.Background(), cfg, wt, false)
 	if err != nil {
-		t.Fatalf("RunPostCreateHooks error: %v", err)
+		t.Fatalf("RunSetupHooks error: %v", err)
 	}
 }
 
-func TestRunPostCreateHooksDryRun(t *testing.T) {
+func TestRunSetupHooksDryRun(t *testing.T) {
 	cfg := &config.Config{
-		PostCreate: []string{"echo hello"},
+		Setup: []string{"echo hello"},
 	}
 	wt := t.TempDir()
 
-	err := RunPostCreateHooks(context.Background(), cfg, wt, true)
+	err := RunSetupHooks(context.Background(), cfg, wt, true)
 	if err != nil {
-		t.Fatalf("RunPostCreateHooks dry-run error: %v", err)
+		t.Fatalf("RunSetupHooks dry-run error: %v", err)
 	}
 }
 
-func TestRunPostCreateHooksFailure(t *testing.T) {
+func TestRunSetupHooksFailure(t *testing.T) {
 	cfg := &config.Config{
-		PostCreate: []string{"false"},
+		Setup: []string{"false"},
 	}
 	wt := t.TempDir()
 
-	err := RunPostCreateHooks(context.Background(), cfg, wt, false)
+	err := RunSetupHooks(context.Background(), cfg, wt, false)
 	if err == nil {
 		t.Fatal("expected error from failing hook")
 	}
 }
 
-func TestRunPostCreateHooksEmpty(t *testing.T) {
+func TestRunSetupHooksEmpty(t *testing.T) {
 	cfg := &config.Config{}
 	wt := t.TempDir()
 
-	err := RunPostCreateHooks(context.Background(), cfg, wt, false)
+	err := RunSetupHooks(context.Background(), cfg, wt, false)
 	if err != nil {
-		t.Fatalf("RunPostCreateHooks with empty hooks error: %v", err)
+		t.Fatalf("RunSetupHooks with empty hooks error: %v", err)
 	}
 }
 
-func TestRunPostCreateHooksContinuesOnFailure(t *testing.T) {
+func TestRunSetupHooksContinuesOnFailure(t *testing.T) {
 	cfg := &config.Config{
-		PostCreate: []string{"echo ok", "false", "echo still-runs"},
+		Setup: []string{"echo ok", "false", "echo still-runs"},
 	}
 	wt := t.TempDir()
 
-	err := RunPostCreateHooks(context.Background(), cfg, wt, false)
+	err := RunSetupHooks(context.Background(), cfg, wt, false)
 	if err == nil {
 		t.Fatal("expected error from failing hook")
+	}
+}
+
+func TestRunTeardownHooks(t *testing.T) {
+	cfg := &config.Config{
+		Teardown: []string{"echo cleanup"},
+	}
+	wt := t.TempDir()
+
+	err := RunTeardownHooks(context.Background(), cfg, wt, false)
+	if err != nil {
+		t.Fatalf("RunTeardownHooks error: %v", err)
+	}
+}
+
+func TestRunTeardownHooksEmpty(t *testing.T) {
+	cfg := &config.Config{}
+	wt := t.TempDir()
+
+	err := RunTeardownHooks(context.Background(), cfg, wt, false)
+	if err != nil {
+		t.Fatalf("RunTeardownHooks with empty hooks error: %v", err)
+	}
+}
+
+func TestRunTeardownHooksFailure(t *testing.T) {
+	cfg := &config.Config{
+		Teardown: []string{"false"},
+	}
+	wt := t.TempDir()
+
+	err := RunTeardownHooks(context.Background(), cfg, wt, false)
+	if err == nil {
+		t.Fatal("expected error from failing teardown hook")
 	}
 }

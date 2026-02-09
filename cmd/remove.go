@@ -103,6 +103,10 @@ func runRemove(cmd *cobra.Command, args []string) error {
 		}
 	}
 
+	if err := project.RunTeardownHooks(ctx, cfg, selected.Path, IsDryRun()); err != nil {
+		ui.Warning("Teardown hooks failed: " + err.Error())
+	}
+
 	ui.Step("Removing worktree: " + selected.Branch)
 	if err := runner.WorktreeRemove(ctx, selected.Path, force); err != nil {
 		return err

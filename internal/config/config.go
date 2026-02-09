@@ -17,10 +17,11 @@ var (
 )
 
 type Config struct {
-	Version     int      `yaml:"version"`
-	GitDir      string   `yaml:"git_dir"`
-	PostCreate  []string `yaml:"post_create,omitempty"`
-	ProjectType string   `yaml:"project_type,omitempty"`
+	Version  int      `yaml:"version"`
+	GitDir   string   `yaml:"git_dir"`
+	Setup    []string `yaml:"setup,omitempty"`
+	Teardown []string `yaml:"teardown,omitempty"`
+	Editor   string   `yaml:"editor,omitempty"`
 }
 
 func DefaultConfig() Config {

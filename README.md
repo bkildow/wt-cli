@@ -8,8 +8,8 @@ A CLI for managing git worktree-based development workflows. Clone once as a bar
 - **Shared files** — copy per-worktree configs or symlink heavy directories (node_modules, vendor) once
 - **Template variables** — `${WORKTREE_NAME}`, `${DATABASE_NAME}`, etc. substituted in copied files
 - **Interactive by default** — branch/worktree pickers when arguments are omitted
-- **Post-create hooks** — run setup commands automatically after creating a worktree
-- **IDE integration** — open worktrees in Cursor, VS Code, or Zed
+- **Setup/teardown hooks** — run commands automatically when creating or removing worktrees
+- **Editor integration** — open worktrees in your preferred editor ($EDITOR, config, or auto-detect)
 - **Shell completions** — tab-complete worktree names in bash, zsh, and fish
 - **Dry-run support** — preview every destructive operation with `--dry-run`
 
@@ -72,7 +72,7 @@ wt clone <url> [name]        # Clone repo as bare worktree project
 wt clone <url> --dry-run     # Preview without executing
 ```
 
-Auto-detects project type (drupal, node, go, rust, python) and writes `.worktree.yml`. Optionally prompts to create an initial worktree.
+Clones as a bare repo and writes `.worktree.yml`. Optionally prompts to create an initial worktree.
 
 ### wt init
 
@@ -90,7 +90,7 @@ wt add feature/auth          # Create worktree for branch
 wt add                       # Interactive branch picker
 ```
 
-Detects whether the branch exists remotely or creates a new local branch. Applies shared files and runs post-create hooks.
+Detects whether the branch exists remotely or creates a new local branch. Applies shared files and runs setup hooks.
 
 ### wt remove
 
@@ -99,6 +99,8 @@ wt remove feature/auth       # Remove worktree and branch
 wt remove --force            # Skip uncommitted changes check
 ```
 
+Runs teardown hooks before removing the worktree directory.
+
 ### wt cd
 
 ```bash
@@ -106,7 +108,7 @@ cd "$(wt cd feature/auth)"   # Navigate to worktree
 wt cd                        # Interactive picker
 ```
 
-Prints the absolute path to stdout. See [Shell Integration](#shell-integration) for a wrapper that handles `cd` directly.
+Prints the absolute path to stdout. When run without a shell wrapper, `wt cd` prints a hint about setting one up. See [Shell Integration](#shell-integration) for details.
 
 ### wt apply
 
@@ -120,11 +122,11 @@ Copies files from `shared/copy/` (with template substitution) and creates symlin
 ### wt open
 
 ```bash
-wt open feature/auth         # Open in auto-detected IDE
-wt open --cursor             # Open in Cursor
-wt open --code               # Open in VS Code
-wt open --zed                # Open in Zed
+wt open feature/auth         # Open in editor
+wt open                      # Interactive picker
 ```
+
+Editor resolution order: `editor` field in `.worktree.yml` > `$EDITOR` env var > auto-detect (Cursor, VS Code, Zed).
 
 ### wt status
 
@@ -191,18 +193,21 @@ project/
 ```yaml
 version: 1
 git_dir: .bare
-project_type: node
-post_create:
+editor: cursor
+setup:
   - "npm install"
   - "cp .env.example .env"
+teardown:
+  - "docker compose down"
 ```
 
 | Field | Description | Default |
 |-------|-------------|---------|
 | `version` | Config version | `1` |
 | `git_dir` | Path to bare repository | `.bare` |
-| `project_type` | Auto-detected project type | `generic` |
-| `post_create` | Commands to run after creating a worktree | `[]` |
+| `editor` | Preferred editor binary name | (auto-detect) |
+| `setup` | Commands to run after creating a worktree | `[]` |
+| `teardown` | Commands to run before removing a worktree | `[]` |
 
 ### Template Variables
 

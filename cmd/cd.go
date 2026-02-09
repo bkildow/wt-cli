@@ -8,6 +8,7 @@ import (
 	"github.com/briankildow/wt-cli/internal/git"
 	"github.com/briankildow/wt-cli/internal/project"
 	"github.com/briankildow/wt-cli/internal/ui"
+	isatty "github.com/mattn/go-isatty"
 	"github.com/spf13/cobra"
 )
 
@@ -66,6 +67,12 @@ func runCd(cmd *cobra.Command, args []string) error {
 	shell, _ := cmd.Flags().GetString("shell-function")
 	if shell != "" {
 		return printShellFunction(shell)
+	}
+
+	// Detect if stdout is a terminal (wrapper pipes stdout, so TTY means no wrapper)
+	if isatty.IsTerminal(os.Stdout.Fd()) || isatty.IsCygwinTerminal(os.Stdout.Fd()) {
+		ui.Info("Tip: wt cd prints a path but can't change your directory directly.")
+		ui.Info("  Run: wt cd --shell-function bash  (or zsh|fish) to get a shell wrapper.")
 	}
 
 	cwd, err := os.Getwd()

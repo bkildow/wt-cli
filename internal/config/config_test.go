@@ -10,9 +10,11 @@ func TestLoadValidConfig(t *testing.T) {
 	dir := t.TempDir()
 	content := `version: 1
 git_dir: .bare
-post_create:
+setup:
   - npm install
-project_type: node
+teardown:
+  - "docker compose down"
+editor: cursor
 `
 	if err := os.WriteFile(filepath.Join(dir, ConfigFileName), []byte(content), 0644); err != nil {
 		t.Fatal(err)
@@ -29,11 +31,14 @@ project_type: node
 	if cfg.GitDir != ".bare" {
 		t.Errorf("git_dir = %q, want %q", cfg.GitDir, ".bare")
 	}
-	if len(cfg.PostCreate) != 1 || cfg.PostCreate[0] != "npm install" {
-		t.Errorf("post_create = %v, want [npm install]", cfg.PostCreate)
+	if len(cfg.Setup) != 1 || cfg.Setup[0] != "npm install" {
+		t.Errorf("setup = %v, want [npm install]", cfg.Setup)
 	}
-	if cfg.ProjectType != "node" {
-		t.Errorf("project_type = %q, want %q", cfg.ProjectType, "node")
+	if len(cfg.Teardown) != 1 || cfg.Teardown[0] != "docker compose down" {
+		t.Errorf("teardown = %v, want [docker compose down]", cfg.Teardown)
+	}
+	if cfg.Editor != "cursor" {
+		t.Errorf("editor = %q, want %q", cfg.Editor, "cursor")
 	}
 }
 
@@ -83,10 +88,11 @@ func TestLoadInvalidYAML(t *testing.T) {
 func TestSaveAndLoadRoundTrip(t *testing.T) {
 	dir := t.TempDir()
 	original := &Config{
-		Version:     1,
-		GitDir:      ".bare",
-		PostCreate:  []string{"make build", "make test"},
-		ProjectType: "go",
+		Version:  1,
+		GitDir:   ".bare",
+		Setup:    []string{"make build", "make test"},
+		Teardown: []string{"make clean"},
+		Editor:   "nvim",
 	}
 
 	if err := original.Save(dir); err != nil {
@@ -104,11 +110,17 @@ func TestSaveAndLoadRoundTrip(t *testing.T) {
 	if loaded.GitDir != original.GitDir {
 		t.Errorf("git_dir = %q, want %q", loaded.GitDir, original.GitDir)
 	}
-	if len(loaded.PostCreate) != len(original.PostCreate) {
-		t.Errorf("post_create len = %d, want %d", len(loaded.PostCreate), len(original.PostCreate))
+	if len(loaded.Setup) != len(original.Setup) {
+		t.Errorf("setup len = %d, want %d", len(loaded.Setup), len(original.Setup))
 	}
-	if loaded.ProjectType != original.ProjectType {
-		t.Errorf("project_type = %q, want %q", loaded.ProjectType, original.ProjectType)
+	if len(loaded.Teardown) != len(original.Teardown) {
+		t.Errorf("teardown len = %d, want %d", len(loaded.Teardown), len(original.Teardown))
+	}
+	if loaded.Teardown[0] != "make clean" {
+		t.Errorf("teardown[0] = %q, want %q", loaded.Teardown[0], "make clean")
+	}
+	if loaded.Editor != original.Editor {
+		t.Errorf("editor = %q, want %q", loaded.Editor, original.Editor)
 	}
 }
 
