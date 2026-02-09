@@ -16,13 +16,13 @@ A CLI for managing git worktree-based development workflows. Clone once as a bar
 ## Install
 
 ```bash
-go install github.com/briankildow/wt-cli/cmd/wt@latest
+go install github.com/bkildow/wt-cli/cmd/wt@latest
 ```
 
 Or build from source:
 
 ```bash
-git clone https://github.com/briankildow/wt-cli.git
+git clone https://github.com/bkildow/wt-cli.git
 cd wt-cli
 go build -o wt ./cmd/wt
 # move wt to somewhere in your $PATH
@@ -53,7 +53,6 @@ wt prune
 | Command | Description |
 |---------|-------------|
 | `wt clone <url> [name]` | Clone a repo as a bare worktree project |
-| `wt init` | Initialize worktree project in current directory |
 | `wt add [branch]` | Create a new worktree for a branch |
 | `wt list` | List all worktrees |
 | `wt remove [name]` | Remove a worktree and its branch |
@@ -63,6 +62,7 @@ wt prune
 | `wt status` | Show status of all worktrees |
 | `wt sync` | Fetch and pull all worktrees |
 | `wt prune` | Remove worktrees with fully merged branches |
+| `wt config init` | Generate annotated `.worktree.yml` with documentation |
 | `wt completion <shell>` | Generate shell completion script |
 
 ### wt clone
@@ -74,14 +74,14 @@ wt clone <url> --dry-run     # Preview without executing
 
 Clones as a bare repo and writes `.worktree.yml`. Optionally prompts to create an initial worktree.
 
-### wt init
+### wt config init
 
 ```bash
-wt init                      # Initialize in current directory
-wt init --force              # Overwrite existing config
+wt config init               # Generate annotated .worktree.yml (backs up existing)
+wt config init --update      # Merge existing values into annotated template
 ```
 
-Creates `shared/copy/`, `shared/symlink/`, `worktrees/` directories and `.worktree.yml`.
+Generates a `.worktree.yml` with documentation comments for every field. If a config already exists, it is backed up to `.worktree.yml.bak` first. Use `--update` to preserve your existing values while adding documentation comments.
 
 ### wt add
 

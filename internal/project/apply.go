@@ -7,7 +7,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/briankildow/wt-cli/internal/ui"
+	"github.com/bkildow/wt-cli/internal/ui"
 )
 
 func ApplyCopy(projectRoot, worktreePath string, dryRun bool, vars *TemplateVars) error {

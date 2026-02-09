@@ -6,10 +6,10 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/briankildow/wt-cli/internal/config"
-	"github.com/briankildow/wt-cli/internal/git"
-	"github.com/briankildow/wt-cli/internal/project"
-	"github.com/briankildow/wt-cli/internal/ui"
+	"github.com/bkildow/wt-cli/internal/config"
+	"github.com/bkildow/wt-cli/internal/git"
+	"github.com/bkildow/wt-cli/internal/project"
+	"github.com/bkildow/wt-cli/internal/ui"
 	"github.com/spf13/cobra"
 )
 
@@ -78,14 +78,12 @@ func runClone(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	cfg := config.DefaultConfig()
-
-	// Save config
+	// Save annotated config
 	ui.Step("Writing " + config.ConfigFileName)
 	if dry {
 		ui.DryRunNotice("write " + filepath.Join(projectRoot, config.ConfigFileName))
 	} else {
-		if err := cfg.Save(projectRoot); err != nil {
+		if err := config.WriteAnnotated(projectRoot); err != nil {
 			return err
 		}
 	}

@@ -22,7 +22,7 @@ func init() {
 	rootCmd.AddCommand(newRemoveCmd())
 	rootCmd.AddCommand(newCdCmd())
 	rootCmd.AddCommand(newApplyCmd())
-	rootCmd.AddCommand(newInitCmd())
+	rootCmd.AddCommand(newConfigCmd())
 	rootCmd.AddCommand(newCompletionCmd())
 	rootCmd.AddCommand(newOpenCmd())
 	rootCmd.AddCommand(newStatusCmd())

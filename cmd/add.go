@@ -5,10 +5,10 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/briankildow/wt-cli/internal/config"
-	"github.com/briankildow/wt-cli/internal/git"
-	"github.com/briankildow/wt-cli/internal/project"
-	"github.com/briankildow/wt-cli/internal/ui"
+	"github.com/bkildow/wt-cli/internal/config"
+	"github.com/bkildow/wt-cli/internal/git"
+	"github.com/bkildow/wt-cli/internal/project"
+	"github.com/bkildow/wt-cli/internal/ui"
 	"github.com/spf13/cobra"
 )
 

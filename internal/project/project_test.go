@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/briankildow/wt-cli/internal/config"
+	"github.com/bkildow/wt-cli/internal/config"
 )
 
 func TestRepoNameFromURL(t *testing.T) {

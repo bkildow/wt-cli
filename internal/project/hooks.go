@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"os/exec"
 
-	"github.com/briankildow/wt-cli/internal/config"
-	"github.com/briankildow/wt-cli/internal/ui"
+	"github.com/bkildow/wt-cli/internal/config"
+	"github.com/bkildow/wt-cli/internal/ui"
 )
 
 // RunSetupHooks executes each command in cfg.Setup inside the

@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/briankildow/wt-cli/internal/ui"
+	"github.com/bkildow/wt-cli/internal/ui"
 )
 
 func TestParseRemoteBranches(t *testing.T) {

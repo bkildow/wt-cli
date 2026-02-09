@@ -3,7 +3,7 @@ package main
 import (
 	"os"
 
-	"github.com/briankildow/wt-cli/cmd"
+	"github.com/bkildow/wt-cli/cmd"
 )
 
 func main() {

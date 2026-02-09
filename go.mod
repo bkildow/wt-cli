@@ -1,4 +1,4 @@
-module github.com/briankildow/wt-cli
+module github.com/bkildow/wt-cli
 
 go 1.25.7
 

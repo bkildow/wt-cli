@@ -6,8 +6,8 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/briankildow/wt-cli/internal/config"
-	"github.com/briankildow/wt-cli/internal/ui"
+	"github.com/bkildow/wt-cli/internal/config"
+	"github.com/bkildow/wt-cli/internal/ui"
 )
 
 func FindRoot(startDir string) (string, error) {

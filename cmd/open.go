@@ -5,10 +5,10 @@ import (
 	"os"
 	"os/exec"
 
-	"github.com/briankildow/wt-cli/internal/config"
-	"github.com/briankildow/wt-cli/internal/git"
-	"github.com/briankildow/wt-cli/internal/project"
-	"github.com/briankildow/wt-cli/internal/ui"
+	"github.com/bkildow/wt-cli/internal/config"
+	"github.com/bkildow/wt-cli/internal/git"
+	"github.com/bkildow/wt-cli/internal/project"
+	"github.com/bkildow/wt-cli/internal/ui"
 	"github.com/spf13/cobra"
 )
 
@@ -144,5 +144,9 @@ func runOpen(cmd *cobra.Command, args []string) error {
 	}
 
 	ui.Step(fmt.Sprintf("Opening %s in %s", selected.Branch, editorBinary))
-	return exec.Command(editorBinary, selected.Path).Start()
+	c := exec.Command(editorBinary, selected.Path)
+	c.Stdin = os.Stdin
+	c.Stdout = os.Stdout
+	c.Stderr = os.Stderr
+	return c.Run()
 }

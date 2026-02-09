@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/briankildow/wt-cli/internal/ui"
+	"github.com/bkildow/wt-cli/internal/ui"
 )
 
 type WorktreeInfo struct {

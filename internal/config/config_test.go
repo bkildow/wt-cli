@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -137,5 +138,132 @@ func TestExists(t *testing.T) {
 
 	if !Exists(dir) {
 		t.Error("Exists should return true when config file is present")
+	}
+}
+
+func TestWriteAnnotated(t *testing.T) {
+	dir := t.TempDir()
+
+	if err := WriteAnnotated(dir); err != nil {
+		t.Fatalf("WriteAnnotated error: %v", err)
+	}
+
+	data, err := os.ReadFile(filepath.Join(dir, ConfigFileName))
+	if err != nil {
+		t.Fatalf("read error: %v", err)
+	}
+	content := string(data)
+
+	// Should contain documentation comments
+	if !strings.Contains(content, "# wt - worktree project configuration") {
+		t.Error("missing header comment")
+	}
+
+	// Should have defaults
+	if !strings.Contains(content, "version: 1") {
+		t.Error("missing version default")
+	}
+	if !strings.Contains(content, "git_dir: .bare") {
+		t.Error("missing git_dir default")
+	}
+
+	// Optional fields should be commented out
+	if !strings.Contains(content, "# editor: cursor") {
+		t.Error("editor should be commented out as example")
+	}
+	if !strings.Contains(content, "# setup:") {
+		t.Error("setup should be commented out as example")
+	}
+	if !strings.Contains(content, "# teardown:") {
+		t.Error("teardown should be commented out as example")
+	}
+
+	// Should be loadable
+	cfg, err := Load(dir)
+	if err != nil {
+		t.Fatalf("annotated config should be loadable: %v", err)
+	}
+	if cfg.Version != 1 {
+		t.Errorf("version = %d, want 1", cfg.Version)
+	}
+	if cfg.GitDir != DefaultGitDir {
+		t.Errorf("git_dir = %q, want %q", cfg.GitDir, DefaultGitDir)
+	}
+}
+
+func TestWriteAnnotatedWithValues(t *testing.T) {
+	dir := t.TempDir()
+
+	existing := &Config{
+		Version:  1,
+		GitDir:   ".bare",
+		Setup:    []string{"npm install", "cp .env.example .env"},
+		Teardown: []string{"docker compose down"},
+		Editor:   "cursor",
+	}
+
+	if err := WriteAnnotatedWithValues(dir, existing); err != nil {
+		t.Fatalf("WriteAnnotatedWithValues error: %v", err)
+	}
+
+	data, err := os.ReadFile(filepath.Join(dir, ConfigFileName))
+	if err != nil {
+		t.Fatalf("read error: %v", err)
+	}
+	content := string(data)
+
+	// Should contain documentation comments
+	if !strings.Contains(content, "# wt - worktree project configuration") {
+		t.Error("missing header comment")
+	}
+
+	// Editor should be uncommented with existing value
+	if !strings.Contains(content, "editor: cursor") {
+		t.Error("missing editor value")
+	}
+	if strings.Contains(content, "# editor: cursor") {
+		t.Error("editor should not be commented out when value exists")
+	}
+
+	// Setup should be uncommented with existing values
+	if !strings.Contains(content, "setup:") {
+		t.Error("missing setup section")
+	}
+
+	// Should be loadable and round-trip correctly
+	cfg, err := Load(dir)
+	if err != nil {
+		t.Fatalf("annotated config with values should be loadable: %v", err)
+	}
+	if cfg.Editor != "cursor" {
+		t.Errorf("editor = %q, want %q", cfg.Editor, "cursor")
+	}
+	if len(cfg.Setup) != 2 {
+		t.Errorf("setup len = %d, want 2", len(cfg.Setup))
+	}
+	if cfg.Setup[0] != "npm install" {
+		t.Errorf("setup[0] = %q, want %q", cfg.Setup[0], "npm install")
+	}
+	if len(cfg.Teardown) != 1 || cfg.Teardown[0] != "docker compose down" {
+		t.Errorf("teardown = %v, want [docker compose down]", cfg.Teardown)
+	}
+}
+
+func TestYamlQuote(t *testing.T) {
+	tests := []struct {
+		input string
+		want  string
+	}{
+		{"npm install", "npm install"},
+		{"simple", "simple"},
+		{"has: colon", `"has: colon"`},
+		{"has $var", `"has $var"`},
+		{"", `""`},
+	}
+	for _, tt := range tests {
+		got := yamlQuote(tt.input)
+		if got != tt.want {
+			t.Errorf("yamlQuote(%q) = %q, want %q", tt.input, got, tt.want)
+		}
 	}
 }

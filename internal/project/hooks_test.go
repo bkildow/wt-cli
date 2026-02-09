@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/briankildow/wt-cli/internal/config"
+	"github.com/bkildow/wt-cli/internal/config"
 )
 
 func TestRunSetupHooks(t *testing.T) {
