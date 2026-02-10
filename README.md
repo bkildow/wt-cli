@@ -6,7 +6,7 @@ A CLI for managing git worktree-based development workflows. Clone once as a bar
 
 - **Bare-repo workflow** — no `.git` at project root; all worktrees live under `worktrees/`
 - **Shared files** — copy per-worktree configs or symlink heavy directories (node_modules, vendor) once
-- **Template variables** — `${WORKTREE_NAME}`, `${DATABASE_NAME}`, etc. substituted in copied files
+- **Template variables** — `${WORKTREE_ID}`, `${BRANCH_NAME}`, etc. substituted in `.template` files
 - **Interactive by default** — branch/worktree pickers when arguments are omitted
 - **Setup/teardown hooks** — run commands automatically when creating or removing worktrees
 - **Editor integration** — open worktrees in your preferred editor ($EDITOR, config, or auto-detect)
@@ -221,16 +221,15 @@ teardown:
 
 ### Template Variables
 
-Files in `shared/copy/` support these variables:
+Files in `shared/copy/` ending in `.template` get variable substitution, with the `.template` suffix stripped from the output filename. All other files are copied as-is.
 
-| Variable | Example (branch: `feature/auth`) |
-|----------|----------------------------------|
-| `${WORKTREE_NAME}` | `feature-auth` |
-| `${WORKTREE_PATH}` | `/path/to/worktrees/feature-auth` |
-| `${BRANCH_NAME}` | `feature/auth` |
-| `${DATABASE_NAME}` | `feature_auth` |
+Example: `shared/copy/.env.template` → `worktrees/feature-auth/.env`
 
-Binary files are detected and skipped automatically.
+| Variable | Derivation | Example (branch: `feature/Auth`) |
+|----------|------------|----------------------------------|
+| `${WORKTREE_ID}` | Branch lowercased, `/` → `-` | `feature-auth` |
+| `${WORKTREE_PATH}` | Absolute worktree path | `/path/to/worktrees/feature/Auth` |
+| `${BRANCH_NAME}` | Raw branch name | `feature/Auth` |
 
 ## Shell Integration
 

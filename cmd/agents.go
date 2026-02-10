@@ -148,14 +148,17 @@ Fields:
 
 ## Template Variables
 
-Files in shared/copy/ support these substitution variables:
+Files in shared/copy/ ending in .template get variable substitution, with the
+.template suffix stripped from the output filename. All other files are copied
+as-is (no scanning, no substitution).
 
-- ${WORKTREE_NAME} — branch with / replaced by - (e.g. feature-auth)
+Example: shared/copy/.env.template → worktrees/feature-auth/.env
+
+Available variables:
+
+- ${WORKTREE_ID} — branch lowercased with / replaced by - (e.g. feature-auth)
 - ${WORKTREE_PATH} — absolute path to the worktree
-- ${BRANCH_NAME} — original branch name (e.g. feature/auth)
-- ${DATABASE_NAME} — lowercase with - and . replaced by _ (e.g. feature_auth)
-
-Binary files are detected and skipped automatically.
+- ${BRANCH_NAME} — original branch name (e.g. feature/Auth)
 
 ## Key Caveats
 

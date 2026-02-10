@@ -167,8 +167,8 @@ func TestApplyCopyWithTemplateVars(t *testing.T) {
 	if err := os.MkdirAll(copyDir, 0755); err != nil {
 		t.Fatal(err)
 	}
-	content := "db: ${DATABASE_NAME}\nname: ${WORKTREE_NAME}\n"
-	if err := os.WriteFile(filepath.Join(copyDir, "config.yml"), []byte(content), 0644); err != nil {
+	content := "ID=${WORKTREE_ID}\nPATH=${WORKTREE_PATH}\n"
+	if err := os.WriteFile(filepath.Join(copyDir, ".env.template"), []byte(content), 0644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -177,17 +177,21 @@ func TestApplyCopyWithTemplateVars(t *testing.T) {
 		t.Fatalf("ApplyCopy with vars error: %v", err)
 	}
 
-	got, err := os.ReadFile(filepath.Join(wt, "config.yml"))
-	if err != nil {
-		t.Fatalf("config.yml not created: %v", err)
+	// .template suffix should be stripped
+	if _, err := os.Stat(filepath.Join(wt, ".env.template")); err == nil {
+		t.Error(".env.template should not exist in output")
 	}
-	want := "db: feature_login\nname: feature-login\n"
+	got, err := os.ReadFile(filepath.Join(wt, ".env"))
+	if err != nil {
+		t.Fatalf(".env not created: %v", err)
+	}
+	want := "ID=feature-login\nPATH=" + wt + "\n"
 	if string(got) != want {
-		t.Errorf("config.yml content = %q, want %q", got, want)
+		t.Errorf(".env content = %q, want %q", got, want)
 	}
 }
 
-func TestApplyCopyBinaryFileSkipsTemplate(t *testing.T) {
+func TestApplyCopyNonTemplateFilesCopiedAsIs(t *testing.T) {
 	root := t.TempDir()
 	wt := t.TempDir()
 
@@ -195,22 +199,22 @@ func TestApplyCopyBinaryFileSkipsTemplate(t *testing.T) {
 	if err := os.MkdirAll(copyDir, 0755); err != nil {
 		t.Fatal(err)
 	}
-	content := []byte("${WORKTREE_NAME}")
-	content = append(content, 0x00)
-	if err := os.WriteFile(filepath.Join(copyDir, "image.bin"), content, 0644); err != nil {
+	// Non-.template files should be copied verbatim, even with ${...} patterns
+	content := "value: ${WORKTREE_ID}\n"
+	if err := os.WriteFile(filepath.Join(copyDir, "config.yml"), []byte(content), 0644); err != nil {
 		t.Fatal(err)
 	}
 
 	vars := NewTemplateVars(wt, "feature/login")
 	if err := ApplyCopy(root, wt, false, &vars); err != nil {
-		t.Fatalf("ApplyCopy binary error: %v", err)
+		t.Fatalf("ApplyCopy error: %v", err)
 	}
 
-	got, err := os.ReadFile(filepath.Join(wt, "image.bin"))
+	got, err := os.ReadFile(filepath.Join(wt, "config.yml"))
 	if err != nil {
-		t.Fatalf("image.bin not created: %v", err)
+		t.Fatalf("config.yml not created: %v", err)
 	}
-	if string(got) != string(content) {
-		t.Errorf("binary file was modified, want literal preservation")
+	if string(got) != content {
+		t.Errorf("non-template file was modified: got %q, want %q", got, content)
 	}
 }

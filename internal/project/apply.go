@@ -34,7 +34,11 @@ func ApplyCopy(projectRoot, worktreePath string, dryRun bool, vars *TemplateVars
 		dest := filepath.Join(worktreePath, rel)
 
 		if dryRun {
-			ui.DryRunNotice(fmt.Sprintf("copy %s -> %s", path, dest))
+			dryDest := dest
+			if vars != nil && IsTemplateFile(rel) {
+				dryDest = filepath.Join(worktreePath, StripTemplateExt(rel))
+			}
+			ui.DryRunNotice(fmt.Sprintf("copy %s -> %s", path, dryDest))
 			return nil
 		}
 
@@ -42,26 +46,19 @@ func ApplyCopy(projectRoot, worktreePath string, dryRun bool, vars *TemplateVars
 			return err
 		}
 
-		if vars != nil {
-			bin, err := isBinaryFile(path)
+		if vars != nil && IsTemplateFile(rel) {
+			content, err := os.ReadFile(path)
 			if err != nil {
 				return err
 			}
-			if !bin {
-				content, err := os.ReadFile(path)
-				if err != nil {
-					return err
-				}
-				if HasTemplateVars(string(content)) {
-					srcInfo, err := os.Stat(path)
-					if err != nil {
-						return err
-					}
-					processed := ProcessTemplate(string(content), *vars)
-					ui.Info(fmt.Sprintf("  substituted template variables in %s", rel))
-					return os.WriteFile(dest, []byte(processed), srcInfo.Mode())
-				}
+			srcInfo, err := os.Stat(path)
+			if err != nil {
+				return err
 			}
+			dest = filepath.Join(worktreePath, StripTemplateExt(rel))
+			processed := ProcessTemplate(string(content), *vars)
+			ui.Info(fmt.Sprintf("  substituted template variables in %s", StripTemplateExt(rel)))
+			return os.WriteFile(dest, []byte(processed), srcInfo.Mode())
 		}
 
 		return copyFile(path, dest)
