@@ -64,6 +64,7 @@ wt prune
 | `wt prune` | Remove worktrees with fully merged branches |
 | `wt config init` | Generate annotated `.worktree.yml` with documentation |
 | `wt agents` | Print AI agent workflow instructions |
+| `wt shell-init <shell>` | Print shell startup config (wrapper + completions) |
 | `wt completion <shell>` | Generate shell completion script |
 
 ### wt clone
@@ -233,58 +234,31 @@ Example: `shared/copy/.env.template` → `worktrees/feature-auth/.env`
 
 ## Shell Integration
 
-### Navigation Wrapper
+Add one line to your shell config to enable directory navigation (`wt cd`) and tab completions:
 
-`wt cd` prints a path to stdout. To make `wt cd` actually change your directory, add a shell wrapper:
-
-**Bash / Zsh** (add to `~/.bashrc` or `~/.zshrc`):
+**Bash** (`~/.bashrc`):
 
 ```bash
-wt() {
-  if [ "$1" = "cd" ]; then
-    shift
-    local dir
-    dir="$(command wt cd "$@")"
-    if [ -n "$dir" ]; then
-      cd "$dir" || return
-    fi
-  else
-    command wt "$@"
-  fi
-}
+eval "$(wt shell-init bash)"
 ```
 
-**Fish** (add to `~/.config/fish/config.fish`):
+**Zsh** (`~/.zshrc`):
+
+```bash
+eval "$(wt shell-init zsh)"
+```
+
+**Fish** (`~/.config/fish/config.fish`):
 
 ```fish
-function wt
-  if test "$argv[1]" = "cd"
-    set -l dir (command wt cd $argv[2..])
-    if test -n "$dir"
-      cd "$dir"
-    end
-  else
-    command wt $argv
-  end
-end
+wt shell-init fish | source
 ```
 
-Or generate it with `wt cd --shell-function bash|zsh|fish`.
+This sets up a `wt` wrapper function so that `wt cd` changes your directory, and registers tab completions for all commands and worktree names.
 
-### Tab Completions
+### Manual Setup
 
-```bash
-# Bash
-wt completion bash > /etc/bash_completion.d/wt
-
-# Zsh
-wt completion zsh > "${fpath[1]}/_wt"
-
-# Fish
-wt completion fish > ~/.config/fish/completions/wt.fish
-```
-
-Worktree names are completed for `add`, `remove`, `cd`, `apply`, and `open`.
+If you prefer to configure the wrapper and completions separately, see `wt shell-init <shell>` for the wrapper function source and `wt completion <shell>` for standalone completion scripts.
 
 ## License
 

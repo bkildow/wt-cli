@@ -25,6 +25,7 @@ func init() {
 	rootCmd.AddCommand(newApplyCmd())
 	rootCmd.AddCommand(newConfigCmd())
 	rootCmd.AddCommand(newCompletionCmd())
+	rootCmd.AddCommand(newShellInitCmd())
 	rootCmd.AddCommand(newOpenCmd())
 	rootCmd.AddCommand(newStatusCmd())
 	rootCmd.AddCommand(newSyncCmd())
