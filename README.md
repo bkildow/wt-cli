@@ -63,6 +63,7 @@ wt prune
 | `wt sync` | Fetch and pull all worktrees |
 | `wt prune` | Remove worktrees with fully merged branches |
 | `wt config init` | Generate annotated `.worktree.yml` with documentation |
+| `wt agents` | Print AI agent workflow instructions |
 | `wt completion <shell>` | Generate shell completion script |
 
 ### wt clone
@@ -153,6 +154,15 @@ wt prune --force             # Skip confirmation
 ```
 
 Compares branches against the default branch (main/master).
+
+### wt agents
+
+```bash
+wt agents                    # Print AI workflow guide to stdout
+wt agents > AGENTS.md        # Save as a file in your project
+```
+
+Outputs structured workflow instructions for AI coding assistants to understand how to use `wt` in non-interactive mode.
 
 ### wt completion
 

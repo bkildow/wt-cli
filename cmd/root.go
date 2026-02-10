@@ -16,6 +16,7 @@ var rootCmd = &cobra.Command{
 
 func init() {
 	rootCmd.PersistentFlags().BoolVar(&dryRun, "dry-run", false, "Show what would be done without making changes")
+	rootCmd.AddCommand(newAgentsCmd())
 	rootCmd.AddCommand(newCloneCmd())
 	rootCmd.AddCommand(newAddCmd())
 	rootCmd.AddCommand(newListCmd())
