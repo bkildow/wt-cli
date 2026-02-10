@@ -23,8 +23,6 @@ func IsUserAbort(err error) bool {
 func wtKeyMap() *huh.KeyMap {
 	km := huh.NewDefaultKeyMap()
 	km.Quit = key.NewBinding(key.WithKeys("ctrl+c", "esc"))
-	// Disable filter since ESC now quits at form level
-	km.Select.Filter = key.NewBinding(key.WithKeys("/"), key.WithDisabled())
 	return km
 }
 
