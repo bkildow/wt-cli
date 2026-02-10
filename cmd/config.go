@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 
 	"github.com/bkildow/wt-cli/internal/config"
-	"github.com/bkildow/wt-cli/internal/project"
 	"github.com/bkildow/wt-cli/internal/ui"
 	"github.com/spf13/cobra"
 )
@@ -35,12 +34,7 @@ func runConfigInit(cmd *cobra.Command, args []string) error {
 	dry := IsDryRun()
 	update, _ := cmd.Flags().GetBool("update")
 
-	cwd, err := os.Getwd()
-	if err != nil {
-		return err
-	}
-
-	projectRoot, err := project.FindRoot(cwd)
+	projectRoot, err := findProjectRoot()
 	if err != nil {
 		return err
 	}

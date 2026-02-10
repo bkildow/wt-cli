@@ -2,9 +2,7 @@ package cmd
 
 import (
 	"fmt"
-	"os"
 
-	"github.com/bkildow/wt-cli/internal/config"
 	"github.com/bkildow/wt-cli/internal/git"
 	"github.com/bkildow/wt-cli/internal/project"
 	"github.com/bkildow/wt-cli/internal/ui"
@@ -25,17 +23,7 @@ func newSyncCmd() *cobra.Command {
 func runSync(cmd *cobra.Command, args []string) error {
 	ctx := cmd.Context()
 
-	cwd, err := os.Getwd()
-	if err != nil {
-		return err
-	}
-
-	projectRoot, err := project.FindRoot(cwd)
-	if err != nil {
-		return err
-	}
-
-	cfg, err := config.Load(projectRoot)
+	projectRoot, cfg, err := loadProject()
 	if err != nil {
 		return err
 	}

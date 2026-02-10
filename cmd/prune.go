@@ -5,7 +5,6 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/bkildow/wt-cli/internal/config"
 	"github.com/bkildow/wt-cli/internal/git"
 	"github.com/bkildow/wt-cli/internal/project"
 	"github.com/bkildow/wt-cli/internal/ui"
@@ -26,21 +25,12 @@ func newPruneCmd() *cobra.Command {
 func runPrune(cmd *cobra.Command, args []string) error {
 	ctx := cmd.Context()
 
-	cwd, err := os.Getwd()
+	projectRoot, cfg, err := loadProject()
 	if err != nil {
 		return err
 	}
 
-	projectRoot, err := project.FindRoot(cwd)
-	if err != nil {
-		return err
-	}
-
-	cfg, err := config.Load(projectRoot)
-	if err != nil {
-		return err
-	}
-
+	cwd, _ := os.Getwd()
 	runner := git.NewRunner(project.GitDirPath(projectRoot, cfg), IsDryRun())
 
 	defaultBranch, err := runner.GetDefaultBranch(ctx)
