@@ -104,6 +104,9 @@ func runPrune(cmd *cobra.Command, args []string) error {
 		prompter := &ui.InteractivePrompter{}
 		confirmed, err := prompter.Confirm(fmt.Sprintf("Remove %d merged worktree(s)?", len(pruneable)))
 		if err != nil {
+			if ui.IsUserAbort(err) {
+				return nil
+			}
 			return err
 		}
 		if !confirmed {

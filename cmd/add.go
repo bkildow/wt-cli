@@ -55,11 +55,17 @@ func runAdd(cmd *cobra.Command, args []string) error {
 		if len(branches) > 0 {
 			branch, err = prompter.SelectBranch(branches)
 			if err != nil {
+				if ui.IsUserAbort(err) {
+					return nil
+				}
 				return err
 			}
 		} else {
 			branch, err = prompter.InputString("Branch name", "feature/my-branch")
 			if err != nil {
+				if ui.IsUserAbort(err) {
+					return nil
+				}
 				return err
 			}
 		}

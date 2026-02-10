@@ -81,6 +81,9 @@ func runRemove(cmd *cobra.Command, args []string) error {
 		prompter := &ui.InteractivePrompter{}
 		name, err := prompter.SelectWorktree(names)
 		if err != nil {
+			if ui.IsUserAbort(err) {
+				return nil
+			}
 			return err
 		}
 		for _, wt := range filtered {

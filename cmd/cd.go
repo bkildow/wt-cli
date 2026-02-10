@@ -72,6 +72,9 @@ func runCd(cmd *cobra.Command, args []string) error {
 		prompter := &ui.InteractivePrompter{}
 		selected, err = prompter.SelectWorktree(names)
 		if err != nil {
+			if ui.IsUserAbort(err) {
+				return nil
+			}
 			return err
 		}
 	}
