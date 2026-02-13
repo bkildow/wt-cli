@@ -10,8 +10,10 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-const ConfigFileName = ".worktree.yml"
-const DefaultGitDir = ".bare"
+const (
+	ConfigFileName = ".worktree.yml"
+	DefaultGitDir  = ".bare"
+)
 
 var (
 	ErrConfigNotFound = errors.New("config file not found")
@@ -58,7 +60,7 @@ func (c *Config) Save(projectRoot string) error {
 	}
 
 	path := filepath.Join(projectRoot, ConfigFileName)
-	return os.WriteFile(path, data, 0644)
+	return os.WriteFile(path, data, 0o644)
 }
 
 func Exists(projectRoot string) bool {
@@ -138,7 +140,7 @@ func yamlQuote(s string) string {
 func WriteAnnotated(projectRoot string) error {
 	content := renderAnnotatedConfig(nil)
 	path := filepath.Join(projectRoot, ConfigFileName)
-	return os.WriteFile(path, []byte(content), 0644)
+	return os.WriteFile(path, []byte(content), 0o644)
 }
 
 // WriteAnnotatedWithValues writes .worktree.yml using the given config's
@@ -146,5 +148,5 @@ func WriteAnnotated(projectRoot string) error {
 func WriteAnnotatedWithValues(projectRoot string, cfg *Config) error {
 	content := renderAnnotatedConfig(cfg)
 	path := filepath.Join(projectRoot, ConfigFileName)
-	return os.WriteFile(path, []byte(content), 0644)
+	return os.WriteFile(path, []byte(content), 0o644)
 }

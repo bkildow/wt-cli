@@ -1,6 +1,7 @@
 package project
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -37,7 +38,7 @@ func TestFindRoot(t *testing.T) {
 	// Create a nested directory structure with config at the root
 	root := t.TempDir()
 	nested := filepath.Join(root, "a", "b", "c")
-	if err := os.MkdirAll(nested, 0755); err != nil {
+	if err := os.MkdirAll(nested, 0o755); err != nil {
 		t.Fatal(err)
 	}
 
@@ -60,7 +61,7 @@ func TestFindRoot(t *testing.T) {
 func TestFindRootNotFound(t *testing.T) {
 	dir := t.TempDir()
 	_, err := FindRoot(dir)
-	if err != config.ErrConfigNotFound {
+	if !errors.Is(err, config.ErrConfigNotFound) {
 		t.Errorf("err = %v, want ErrConfigNotFound", err)
 	}
 }
@@ -112,8 +113,9 @@ func TestCreateScaffoldDryRun(t *testing.T) {
 
 func TestGitDirPath(t *testing.T) {
 	cfg := &config.Config{GitDir: ".bare"}
-	got := GitDirPath("/home/user/project", cfg)
-	want := filepath.Join("/home/user/project", ".bare")
+	root := "/home/user/project"
+	got := GitDirPath(root, cfg)
+	want := filepath.Join(root, ".bare")
 	if got != want {
 		t.Errorf("GitDirPath = %q, want %q", got, want)
 	}

@@ -47,7 +47,7 @@ func runClone(cmd *cobra.Command, args []string) error {
 	if dry {
 		ui.DryRunNotice("mkdir -p " + projectRoot)
 	} else {
-		if err := os.MkdirAll(projectRoot, 0755); err != nil {
+		if err := os.MkdirAll(projectRoot, 0o755); err != nil {
 			return err
 		}
 	}

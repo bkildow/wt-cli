@@ -42,7 +42,7 @@ func ApplyCopy(projectRoot, worktreePath string, dryRun bool, vars *TemplateVars
 			return nil
 		}
 
-		if err := os.MkdirAll(filepath.Dir(dest), 0755); err != nil {
+		if err := os.MkdirAll(filepath.Dir(dest), 0o755); err != nil {
 			return err
 		}
 
@@ -90,8 +90,8 @@ func ApplySymlinks(projectRoot, worktreePath string, dryRun bool) error {
 			continue
 		}
 
-		// Remove existing file/symlink at destination
-		os.Remove(link)
+		// Remove existing file/symlink at destination (error ignored; Symlink will fail if needed)
+		_ = os.Remove(link)
 
 		if err := os.Symlink(target, link); err != nil {
 			return err
@@ -118,13 +118,13 @@ func copyFile(src, dst string) error {
 	if err != nil {
 		return err
 	}
-	defer in.Close()
+	defer func() { _ = in.Close() }()
 
 	out, err := os.OpenFile(dst, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, srcInfo.Mode())
 	if err != nil {
 		return err
 	}
-	defer out.Close()
+	defer func() { _ = out.Close() }()
 
 	_, err = io.Copy(out, in)
 	return err

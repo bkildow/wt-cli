@@ -8,8 +8,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 make                # Build binary (equivalent to: go build -o wt ./cmd/wt)
 make test           # Run all tests
 make test-short     # Skip integration tests
-make vet            # Lint
-make fmt            # Format code
+make vet            # Lint (golangci-lint)
+make fmt            # Format code (gofumpt)
 make dev            # fmt + vet + test + build
 make clean          # Remove built binary
 make install        # Install to $GOBIN as "wt"

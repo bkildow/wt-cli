@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -17,7 +18,7 @@ teardown:
   - "docker compose down"
 editor: cursor
 `
-	if err := os.WriteFile(filepath.Join(dir, ConfigFileName), []byte(content), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, ConfigFileName), []byte(content), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -47,7 +48,7 @@ func TestLoadMinimalConfig(t *testing.T) {
 	dir := t.TempDir()
 	content := `version: 2
 `
-	if err := os.WriteFile(filepath.Join(dir, ConfigFileName), []byte(content), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, ConfigFileName), []byte(content), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -68,7 +69,7 @@ func TestLoadMinimalConfig(t *testing.T) {
 func TestLoadMissingFile(t *testing.T) {
 	dir := t.TempDir()
 	_, err := Load(dir)
-	if err != ErrConfigNotFound {
+	if !errors.Is(err, ErrConfigNotFound) {
 		t.Errorf("err = %v, want ErrConfigNotFound", err)
 	}
 }
@@ -76,7 +77,7 @@ func TestLoadMissingFile(t *testing.T) {
 func TestLoadInvalidYAML(t *testing.T) {
 	dir := t.TempDir()
 	content := `{{{not yaml`
-	if err := os.WriteFile(filepath.Join(dir, ConfigFileName), []byte(content), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, ConfigFileName), []byte(content), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -132,7 +133,7 @@ func TestExists(t *testing.T) {
 		t.Error("Exists should return false when config file is missing")
 	}
 
-	if err := os.WriteFile(filepath.Join(dir, ConfigFileName), []byte("version: 1\n"), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, ConfigFileName), []byte("version: 1\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 

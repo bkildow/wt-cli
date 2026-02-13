@@ -70,7 +70,7 @@ func runConfigInit(cmd *cobra.Command, args []string) error {
 				if err != nil {
 					return fmt.Errorf("failed to read existing config: %w", err)
 				}
-				if err := os.WriteFile(backupPath, data, 0644); err != nil {
+				if err := os.WriteFile(backupPath, data, 0o644); err != nil {
 					return fmt.Errorf("failed to write backup: %w", err)
 				}
 			}

@@ -388,7 +388,7 @@ func TestIntegrationCloneAndWorktree(t *testing.T) {
 	}
 
 	// Create a file and commit
-	if err := os.WriteFile(filepath.Join(srcDir, "README.md"), []byte("# Test"), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(srcDir, "README.md"), []byte("# Test"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	cmds = [][]string{

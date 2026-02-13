@@ -1,0 +1,40 @@
+version: "2"
+
+linters:
+  enable:
+    - errcheck
+    - govet
+    - staticcheck
+    - unused
+    - ineffassign
+    - gocritic
+    - gosec
+    - errorlint
+    - misspell
+    - unconvert
+  disable:
+    - depguard
+  settings:
+    errcheck:
+      check-type-assertions: false
+      check-blank: false
+      exclude-functions:
+        - fmt.Fprintf
+        - fmt.Fprintln
+    gocritic:
+      enabled-tags:
+        - diagnostic
+        - style
+    gosec:
+      excludes:
+        - G204
+        - G301
+        - G304
+        - G306
+
+formatters:
+  enable:
+    - gofumpt
+
+run:
+  timeout: 5m

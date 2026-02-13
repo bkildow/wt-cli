@@ -12,13 +12,13 @@ func TestApplyCopy(t *testing.T) {
 
 	// Create shared/copy/ with files
 	copyDir := filepath.Join(root, "shared", "copy")
-	if err := os.MkdirAll(filepath.Join(copyDir, "sub"), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Join(copyDir, "sub"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(copyDir, "file.txt"), []byte("hello"), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(copyDir, "file.txt"), []byte("hello"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(copyDir, "sub", "nested.txt"), []byte("nested"), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(copyDir, "sub", "nested.txt"), []byte("nested"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -49,10 +49,10 @@ func TestApplyCopyDryRun(t *testing.T) {
 	wt := t.TempDir()
 
 	copyDir := filepath.Join(root, "shared", "copy")
-	if err := os.MkdirAll(copyDir, 0755); err != nil {
+	if err := os.MkdirAll(copyDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(copyDir, "file.txt"), []byte("hello"), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(copyDir, "file.txt"), []byte("hello"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -80,7 +80,7 @@ func TestApplySymlinks(t *testing.T) {
 
 	symlinkDir := filepath.Join(root, "shared", "symlink")
 	nodeModules := filepath.Join(symlinkDir, "node_modules")
-	if err := os.MkdirAll(nodeModules, 0755); err != nil {
+	if err := os.MkdirAll(nodeModules, 0o755); err != nil {
 		t.Fatal(err)
 	}
 
@@ -103,7 +103,7 @@ func TestApplySymlinksDryRun(t *testing.T) {
 	wt := t.TempDir()
 
 	symlinkDir := filepath.Join(root, "shared", "symlink")
-	if err := os.MkdirAll(filepath.Join(symlinkDir, "node_modules"), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Join(symlinkDir, "node_modules"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 
@@ -131,16 +131,16 @@ func TestApply(t *testing.T) {
 
 	// Set up copy source
 	copyDir := filepath.Join(root, "shared", "copy")
-	if err := os.MkdirAll(copyDir, 0755); err != nil {
+	if err := os.MkdirAll(copyDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(copyDir, "config.json"), []byte("{}"), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(copyDir, "config.json"), []byte("{}"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
 	// Set up symlink source
 	symlinkDir := filepath.Join(root, "shared", "symlink")
-	if err := os.MkdirAll(filepath.Join(symlinkDir, "vendor"), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Join(symlinkDir, "vendor"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 
@@ -164,11 +164,11 @@ func TestApplyCopyWithTemplateVars(t *testing.T) {
 	wt := t.TempDir()
 
 	copyDir := filepath.Join(root, "shared", "copy")
-	if err := os.MkdirAll(copyDir, 0755); err != nil {
+	if err := os.MkdirAll(copyDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
 	content := "ID=${WORKTREE_ID}\nPATH=${WORKTREE_PATH}\n"
-	if err := os.WriteFile(filepath.Join(copyDir, ".env.template"), []byte(content), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(copyDir, ".env.template"), []byte(content), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -196,12 +196,12 @@ func TestApplyCopyNonTemplateFilesCopiedAsIs(t *testing.T) {
 	wt := t.TempDir()
 
 	copyDir := filepath.Join(root, "shared", "copy")
-	if err := os.MkdirAll(copyDir, 0755); err != nil {
+	if err := os.MkdirAll(copyDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
 	// Non-.template files should be copied verbatim, even with ${...} patterns
 	content := "value: ${WORKTREE_ID}\n"
-	if err := os.WriteFile(filepath.Join(copyDir, "config.yml"), []byte(content), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(copyDir, "config.yml"), []byte(content), 0o644); err != nil {
 		t.Fatal(err)
 	}
 

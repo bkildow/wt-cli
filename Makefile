@@ -17,10 +17,10 @@ test-short:
 	go test -short ./...
 
 vet:
-	go vet ./...
+	golangci-lint run ./...
 
 fmt:
-	gofmt -l -w .
+	gofumpt -l -w .
 
 clean:
 	rm -f $(BINARY)
