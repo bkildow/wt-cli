@@ -92,5 +92,6 @@ func runAdd(cmd *cobra.Command, args []string) error {
 	}
 
 	ui.Success("Worktree created: worktrees/" + branch)
+	fmt.Println(worktreePath)
 	return nil
 }
