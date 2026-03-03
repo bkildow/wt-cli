@@ -2,6 +2,11 @@
 package cmd
 
 import (
+	"os"
+
+	lipgloss "charm.land/lipgloss/v2"
+	"github.com/charmbracelet/colorprofile"
+	lipglossv1 "github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
 )
 
@@ -18,6 +23,17 @@ var rootCmd = &cobra.Command{
 }
 
 func init() {
+	// Detect color capabilities against stderr so colors work even when
+	// stdout is piped (e.g. wt cd under the shell wrapper function).
+	//
+	// lipgloss v1: huh v0.8.0 uses v1 styles internally. Without this,
+	// v1's default renderer probes stdout (no-TTY when piped) and strips
+	// all picker colors.
+	lipglossv1.SetDefaultRenderer(lipglossv1.NewRenderer(os.Stderr))
+	// lipgloss v2: override the default Writer (targets stdout) so any
+	// code using lipgloss.Println / lipgloss.Sprint detects against stderr.
+	lipgloss.Writer = colorprofile.NewWriter(os.Stderr, os.Environ())
+
 	rootCmd.PersistentFlags().BoolVar(&dryRun, "dry-run", false, "Show what would be done without making changes")
 	rootCmd.AddCommand(newAgentsCmd())
 	rootCmd.AddCommand(newCloneCmd())
