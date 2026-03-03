@@ -41,6 +41,7 @@ func init() {
 	rootCmd.AddCommand(newSyncCmd())
 	rootCmd.AddCommand(newPruneCmd())
 	rootCmd.AddCommand(newRepairCmd())
+	rootCmd.AddCommand(newRootCmd())
 }
 
 func Execute() error {

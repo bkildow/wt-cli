@@ -62,6 +62,7 @@ wt prune
 | `wt list` | List all worktrees |
 | `wt remove [name]` | Remove a worktree and its branch |
 | `wt cd [name]` | Print worktree path for shell navigation |
+| `wt root` | Print project root path for shell navigation |
 | `wt apply [name]` | Apply shared files to a worktree |
 | `wt open [name]` | Open a worktree in an IDE |
 | `wt status` | Show status of all worktrees |
@@ -119,6 +120,15 @@ wt cd                        # Interactive picker
 ```
 
 Prints the absolute path to stdout. When run without a shell wrapper, `wt cd` prints a hint about setting one up. See [Shell Integration](#shell-integration) for details.
+
+### wt root
+
+```bash
+wt root                      # Navigate to project root (with shell wrapper)
+cd "$(wt root)"              # Navigate without shell wrapper
+```
+
+Prints the absolute path to the project root (the directory containing `.worktree.yml`). With the shell wrapper, `wt root` changes your directory directly.
 
 ### wt apply
 
@@ -280,7 +290,7 @@ eval "$(wt shell-init zsh)"
 wt shell-init fish | source
 ```
 
-This sets up a `wt` wrapper function so that `wt cd` changes your directory, and registers tab completions for all commands and worktree names.
+This sets up a `wt` wrapper function so that `wt cd` and `wt root` change your directory, and registers tab completions for all commands and worktree names.
 
 ### Manual Setup
 
