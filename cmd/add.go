@@ -12,12 +12,14 @@ import (
 )
 
 func newAddCmd() *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "add [branch]",
 		Short: "Create a new worktree",
 		Args:  cobra.MaximumNArgs(1),
 		RunE:  runAdd,
 	}
+	cmd.Flags().Bool("skip-setup", false, "Skip running setup hooks after creating the worktree")
+	return cmd
 }
 
 func runAdd(cmd *cobra.Command, args []string) error {
@@ -92,8 +94,11 @@ func runAdd(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	if err := project.RunSetupHooks(ctx, cfg, worktreePath, dry); err != nil {
-		return err
+	skipSetup, _ := cmd.Flags().GetBool("skip-setup")
+	if !skipSetup {
+		if err := project.RunSetupHooks(ctx, cfg, worktreePath, dry); err != nil {
+			return err
+		}
 	}
 
 	ui.Success("Worktree created: worktrees/" + branch)

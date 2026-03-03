@@ -18,6 +18,7 @@ func newRemoveCmd() *cobra.Command {
 		RunE:              runRemove,
 	}
 	cmd.Flags().Bool("force", false, "Remove even if worktree has uncommitted changes")
+	cmd.Flags().Bool("skip-teardown", false, "Skip running teardown hooks before removing the worktree")
 	return cmd
 }
 
@@ -94,8 +95,11 @@ func runRemove(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	if err := project.RunTeardownHooks(ctx, cfg, selected.Path, IsDryRun()); err != nil {
-		ui.Warning("Teardown hooks failed: " + err.Error())
+	skipTeardown, _ := cmd.Flags().GetBool("skip-teardown")
+	if !skipTeardown {
+		if err := project.RunTeardownHooks(ctx, cfg, selected.Path, IsDryRun()); err != nil {
+			ui.Warning("Teardown hooks failed: " + err.Error())
+		}
 	}
 
 	ui.Step("Removing worktree: " + selected.Branch)
