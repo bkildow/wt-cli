@@ -233,10 +233,15 @@ version: 1
 git_dir: .bare
 editor: cursor
 setup:
-  - "npm install"
   - "cp .env.example .env"
+parallel_setup:
+  - "npm install"
+  - "bundle install"
 teardown:
   - "docker compose down"
+parallel_teardown:
+  - "make clean"
+  - "rm -rf tmp/"
 ```
 
 | Field | Description | Default |
@@ -244,16 +249,27 @@ teardown:
 | `version` | Config version | `1` |
 | `git_dir` | Path to bare repository | `.bare` |
 | `editor` | Preferred editor binary name | (auto-detect) |
-| `setup` | Commands to run after creating a worktree | `[]` |
-| `teardown` | Commands to run before removing a worktree | `[]` |
+| `setup` | Commands to run sequentially after creating a worktree | `[]` |
+| `parallel_setup` | Commands to run concurrently after serial setup hooks | `[]` |
+| `teardown` | Commands to run sequentially before removing a worktree | `[]` |
+| `parallel_teardown` | Commands to run concurrently after serial teardown hooks | `[]` |
 
 ### Setup & Teardown Hooks
 
-Hooks run in the worktree directory via `sh -c`. Each hook runs sequentially; a failing hook is logged but does not prevent subsequent hooks from running.
+Hooks run in the worktree directory via `sh -c`. Serial hooks (`setup`/`teardown`) run sequentially; a failing hook is logged but does not prevent subsequent hooks from running.
 
 - **Setup hooks** run after worktree creation and shared file application. If any hook fails, `wt add` reports the error (the worktree is still created).
 - **Teardown hooks** run before worktree removal. Hook failures are logged as warnings and do not prevent removal.
 - Both respect `--dry-run` (prints what would run without executing).
+
+### Parallel Hooks
+
+Use `parallel_setup` and `parallel_teardown` for independent commands that can run concurrently (e.g., installing packages for different language ecosystems). Execution order:
+
+1. Serial hooks run first (`setup` / `teardown`)
+2. Parallel hooks run after serial hooks complete (`parallel_setup` / `parallel_teardown`)
+
+All parallel commands start simultaneously and run to completion — a failing command does not cancel the others. Each command's output is prefixed with `[command]` to distinguish interleaved output. `--skip-setup` and `--skip-teardown` skip both serial and parallel hooks.
 
 ### Template Variables
 

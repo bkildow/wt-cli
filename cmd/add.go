@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -99,6 +100,9 @@ func runAdd(cmd *cobra.Command, args []string) error {
 	skipSetup, _ := cmd.Flags().GetBool("skip-setup")
 	if !skipSetup {
 		setupErr = project.RunSetupHooks(ctx, cfg, worktreePath, dry)
+		if pErr := project.RunParallelSetupHooks(ctx, cfg, worktreePath, dry); pErr != nil {
+			setupErr = errors.Join(setupErr, pErr)
+		}
 	}
 
 	if setupErr != nil {

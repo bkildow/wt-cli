@@ -14,8 +14,13 @@ func TestLoadValidConfig(t *testing.T) {
 git_dir: .bare
 setup:
   - npm install
+parallel_setup:
+  - bundle install
+  - pip install -r requirements.txt
 teardown:
   - "docker compose down"
+parallel_teardown:
+  - make clean
 editor: cursor
 `
 	if err := os.WriteFile(filepath.Join(dir, ConfigFileName), []byte(content), 0o644); err != nil {
@@ -36,8 +41,14 @@ editor: cursor
 	if len(cfg.Setup) != 1 || cfg.Setup[0] != "npm install" {
 		t.Errorf("setup = %v, want [npm install]", cfg.Setup)
 	}
+	if len(cfg.ParallelSetup) != 2 || cfg.ParallelSetup[0] != "bundle install" {
+		t.Errorf("parallel_setup = %v, want [bundle install, pip install -r requirements.txt]", cfg.ParallelSetup)
+	}
 	if len(cfg.Teardown) != 1 || cfg.Teardown[0] != "docker compose down" {
 		t.Errorf("teardown = %v, want [docker compose down]", cfg.Teardown)
+	}
+	if len(cfg.ParallelTeardown) != 1 || cfg.ParallelTeardown[0] != "make clean" {
+		t.Errorf("parallel_teardown = %v, want [make clean]", cfg.ParallelTeardown)
 	}
 	if cfg.Editor != "cursor" {
 		t.Errorf("editor = %q, want %q", cfg.Editor, "cursor")
@@ -175,8 +186,14 @@ func TestWriteAnnotated(t *testing.T) {
 	if !strings.Contains(content, "# setup:") {
 		t.Error("setup should be commented out as example")
 	}
+	if !strings.Contains(content, "# parallel_setup:") {
+		t.Error("parallel_setup should be commented out as example")
+	}
 	if !strings.Contains(content, "# teardown:") {
 		t.Error("teardown should be commented out as example")
+	}
+	if !strings.Contains(content, "# parallel_teardown:") {
+		t.Error("parallel_teardown should be commented out as example")
 	}
 
 	// Should be loadable

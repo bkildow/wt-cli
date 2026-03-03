@@ -22,11 +22,13 @@ var (
 )
 
 type Config struct {
-	Version  int      `yaml:"version"`
-	GitDir   string   `yaml:"git_dir"`
-	Setup    []string `yaml:"setup,omitempty"`
-	Teardown []string `yaml:"teardown,omitempty"`
-	Editor   string   `yaml:"editor,omitempty"`
+	Version          int      `yaml:"version"`
+	GitDir           string   `yaml:"git_dir"`
+	Setup            []string `yaml:"setup,omitempty"`
+	ParallelSetup    []string `yaml:"parallel_setup,omitempty"`
+	Teardown         []string `yaml:"teardown,omitempty"`
+	ParallelTeardown []string `yaml:"parallel_teardown,omitempty"`
+	Editor           string   `yaml:"editor,omitempty"`
 }
 
 func DefaultConfig() Config {
@@ -113,6 +115,19 @@ func renderAnnotatedConfig(cfg *Config) string {
 		b.WriteString("#   - cp .env.example .env\n")
 	}
 
+	b.WriteString("\n# Commands to run in parallel after creating a new worktree\n")
+	b.WriteString("# These run concurrently after serial setup hooks complete\n")
+	if cfg != nil && len(cfg.ParallelSetup) > 0 {
+		b.WriteString("parallel_setup:\n")
+		for _, s := range cfg.ParallelSetup {
+			fmt.Fprintf(&b, "  - %s\n", yamlQuote(s))
+		}
+	} else {
+		b.WriteString("# parallel_setup:\n")
+		b.WriteString("#   - npm install\n")
+		b.WriteString("#   - bundle install\n")
+	}
+
 	b.WriteString("\n# Commands to run before removing a worktree\n")
 	if cfg != nil && len(cfg.Teardown) > 0 {
 		b.WriteString("teardown:\n")
@@ -122,6 +137,19 @@ func renderAnnotatedConfig(cfg *Config) string {
 	} else {
 		b.WriteString("# teardown:\n")
 		b.WriteString("#   - docker compose down\n")
+	}
+
+	b.WriteString("\n# Commands to run in parallel before removing a worktree\n")
+	b.WriteString("# These run concurrently after serial teardown hooks complete\n")
+	if cfg != nil && len(cfg.ParallelTeardown) > 0 {
+		b.WriteString("parallel_teardown:\n")
+		for _, t := range cfg.ParallelTeardown {
+			fmt.Fprintf(&b, "  - %s\n", yamlQuote(t))
+		}
+	} else {
+		b.WriteString("# parallel_teardown:\n")
+		b.WriteString("#   - docker compose down\n")
+		b.WriteString("#   - make clean\n")
 	}
 
 	return b.String()
