@@ -16,4 +16,5 @@ var (
 	StyleMuted   = lipgloss.NewStyle().Foreground(ColorMuted)
 	StyleCommand = lipgloss.NewStyle().Foreground(ColorMuted).Italic(true)
 	StylePath    = lipgloss.NewStyle().Foreground(ColorInfo).Bold(true)
+	StyleHeading = lipgloss.NewStyle().Foreground(ColorInfo).Bold(true)
 )

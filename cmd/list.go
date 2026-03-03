@@ -45,6 +45,8 @@ func runList(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
+	ui.Heading("Worktrees")
+
 	w := tabwriter.NewWriter(ui.Output, 0, 0, 2, ' ', 0)
 	for _, wt := range filtered {
 		relPath, err := filepath.Rel(projectRoot, wt.Path)

@@ -35,3 +35,7 @@ func DryRunNotice(action string) {
 func Command(cmd string) {
 	fmt.Fprintln(Output, StyleCommand.Render("  $ "+cmd))
 }
+
+func Heading(msg string) {
+	fmt.Fprintln(Output, StyleHeading.Render(msg))
+}
