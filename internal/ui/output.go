@@ -8,7 +8,10 @@ import (
 	lipgloss "charm.land/lipgloss/v2"
 )
 
-var Output io.Writer = os.Stderr
+var (
+	Output  io.Writer = os.Stderr
+	Verbose bool
+)
 
 func Success(msg string) {
 	lipgloss.Fprintln(Output, StyleSuccess.Render("✓ "+msg))
@@ -35,6 +38,9 @@ func DryRunNotice(action string) {
 }
 
 func Command(cmd string) {
+	if !Verbose {
+		return
+	}
 	lipgloss.Fprintln(Output, StyleCommand.Render("  $ "+cmd))
 }
 

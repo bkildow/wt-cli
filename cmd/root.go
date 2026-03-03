@@ -5,6 +5,7 @@ import (
 	"os"
 
 	lipgloss "charm.land/lipgloss/v2"
+	"github.com/bkildow/wt-cli/internal/ui"
 	"github.com/charmbracelet/colorprofile"
 	lipglossv1 "github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
@@ -35,6 +36,7 @@ func init() {
 	lipgloss.Writer = colorprofile.NewWriter(os.Stderr, os.Environ())
 
 	rootCmd.PersistentFlags().BoolVar(&dryRun, "dry-run", false, "Show what would be done without making changes")
+	rootCmd.PersistentFlags().BoolVar(&ui.Verbose, "verbose", false, "Show git commands being executed")
 	rootCmd.AddCommand(newAgentsCmd())
 	rootCmd.AddCommand(newCloneCmd())
 	rootCmd.AddCommand(newAddCmd())

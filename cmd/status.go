@@ -5,10 +5,10 @@ import (
 	"path/filepath"
 	"text/tabwriter"
 
+	lipgloss "charm.land/lipgloss/v2"
 	"github.com/bkildow/wt-cli/internal/git"
 	"github.com/bkildow/wt-cli/internal/project"
 	"github.com/bkildow/wt-cli/internal/ui"
-	lipgloss "charm.land/lipgloss/v2"
 	"github.com/spf13/cobra"
 )
 
