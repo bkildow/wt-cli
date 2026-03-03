@@ -90,18 +90,24 @@ func runAdd(cmd *cobra.Command, args []string) error {
 	}
 
 	vars := project.NewTemplateVars(projectRoot, worktreePath, branch)
-	if err := project.Apply(projectRoot, worktreePath, dry, &vars); err != nil {
+	result, err := project.Apply(projectRoot, worktreePath, dry, &vars)
+	if err != nil {
 		return err
 	}
 
+	var setupErr error
 	skipSetup, _ := cmd.Flags().GetBool("skip-setup")
 	if !skipSetup {
-		if err := project.RunSetupHooks(ctx, cfg, worktreePath, dry); err != nil {
-			return err
-		}
+		setupErr = project.RunSetupHooks(ctx, cfg, worktreePath, dry)
 	}
 
-	ui.Success("Worktree created: worktrees/" + branch)
+	if setupErr != nil {
+		ui.Warning(fmt.Sprintf("Worktree created: worktrees/%s (%d copied, %d symlinked) — setup hooks failed",
+			branch, result.Copied, result.Symlinked))
+	} else {
+		ui.Success(fmt.Sprintf("Worktree created: worktrees/%s (%d copied, %d symlinked)",
+			branch, result.Copied, result.Symlinked))
+	}
 	fmt.Println(worktreePath)
 	return nil
 }

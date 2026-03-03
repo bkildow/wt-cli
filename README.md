@@ -100,7 +100,7 @@ wt add                       # Interactive branch picker
 wt add feature/auth --skip-setup  # Create worktree without running setup hooks
 ```
 
-Detects whether the branch exists remotely or creates a new local branch. Applies shared files and runs setup hooks.
+Detects whether the branch exists remotely or creates a new local branch. Applies shared files and runs setup hooks. If setup hooks fail, the worktree is still created and you are CDed into it.
 
 ### wt remove
 
@@ -137,7 +137,7 @@ wt apply feature/auth        # Apply shared files to one worktree
 wt apply --all               # Apply to all worktrees
 ```
 
-Copies files from `shared/copy/` (with template substitution) and creates symlinks from `shared/symlink/`.
+Copies files from `shared/copy/` (with template substitution) and creates symlinks from `shared/symlink/`. Shows each file copied and symlink created, with a summary count.
 
 ### wt open
 

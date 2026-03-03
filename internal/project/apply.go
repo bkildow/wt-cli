@@ -10,16 +10,23 @@ import (
 	"github.com/bkildow/wt-cli/internal/ui"
 )
 
-func ApplyCopy(projectRoot, worktreePath string, dryRun bool, vars *TemplateVars) error {
+// ApplyResult holds counts of files processed during Apply.
+type ApplyResult struct {
+	Copied    int
+	Symlinked int
+}
+
+func ApplyCopy(projectRoot, worktreePath string, dryRun bool, vars *TemplateVars) (int, error) {
 	copyDir := filepath.Join(projectRoot, "shared", "copy")
 
 	if _, err := os.Stat(copyDir); os.IsNotExist(err) {
-		return nil
+		return 0, nil
 	}
 
 	ui.Step("Copying shared files")
 
-	return filepath.WalkDir(copyDir, func(path string, d fs.DirEntry, err error) error {
+	var count int
+	err := filepath.WalkDir(copyDir, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -58,29 +65,37 @@ func ApplyCopy(projectRoot, worktreePath string, dryRun bool, vars *TemplateVars
 			dest = filepath.Join(worktreePath, StripTemplateExt(rel))
 			processed := ProcessTemplate(string(content), *vars)
 			ui.Info(fmt.Sprintf("  substituted template variables in %s", StripTemplateExt(rel)))
+			count++
 			return os.WriteFile(dest, []byte(processed), srcInfo.Mode())
 		}
 
-		return copyFile(path, dest)
+		if err := copyFile(path, dest); err != nil {
+			return err
+		}
+		ui.Info(fmt.Sprintf("  copied %s", rel))
+		count++
+		return nil
 	})
+	return count, err
 }
 
 // ApplySymlinks creates symlinks in the worktree for each top-level entry
 // in shared/symlink/.
-func ApplySymlinks(projectRoot, worktreePath string, dryRun bool) error {
+func ApplySymlinks(projectRoot, worktreePath string, dryRun bool) (int, error) {
 	symlinkDir := filepath.Join(projectRoot, "shared", "symlink")
 
 	if _, err := os.Stat(symlinkDir); os.IsNotExist(err) {
-		return nil
+		return 0, nil
 	}
 
 	ui.Step("Creating symlinks")
 
 	entries, err := os.ReadDir(symlinkDir)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
+	var count int
 	for _, entry := range entries {
 		target := filepath.Join(symlinkDir, entry.Name())
 		link := filepath.Join(worktreePath, entry.Name())
@@ -94,18 +109,27 @@ func ApplySymlinks(projectRoot, worktreePath string, dryRun bool) error {
 		_ = os.Remove(link)
 
 		if err := os.Symlink(target, link); err != nil {
-			return err
+			return count, err
 		}
+
+		relTarget, _ := filepath.Rel(worktreePath, target)
+		ui.Info(fmt.Sprintf("  symlinked %s → %s", entry.Name(), relTarget))
+		count++
 	}
 
-	return nil
+	return count, nil
 }
 
-func Apply(projectRoot, worktreePath string, dryRun bool, vars *TemplateVars) error {
-	if err := ApplyCopy(projectRoot, worktreePath, dryRun, vars); err != nil {
-		return err
+func Apply(projectRoot, worktreePath string, dryRun bool, vars *TemplateVars) (ApplyResult, error) {
+	copied, err := ApplyCopy(projectRoot, worktreePath, dryRun, vars)
+	if err != nil {
+		return ApplyResult{}, err
 	}
-	return ApplySymlinks(projectRoot, worktreePath, dryRun)
+	symlinked, err := ApplySymlinks(projectRoot, worktreePath, dryRun)
+	if err != nil {
+		return ApplyResult{}, err
+	}
+	return ApplyResult{Copied: copied, Symlinked: symlinked}, nil
 }
 
 func copyFile(src, dst string) error {

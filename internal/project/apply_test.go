@@ -22,7 +22,7 @@ func TestApplyCopy(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := ApplyCopy(root, wt, false, nil); err != nil {
+	if _, err := ApplyCopy(root, wt, false, nil); err != nil {
 		t.Fatalf("ApplyCopy error: %v", err)
 	}
 
@@ -56,7 +56,7 @@ func TestApplyCopyDryRun(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := ApplyCopy(root, wt, true, nil); err != nil {
+	if _, err := ApplyCopy(root, wt, true, nil); err != nil {
 		t.Fatalf("ApplyCopy dry-run error: %v", err)
 	}
 
@@ -69,7 +69,7 @@ func TestApplyCopyMissingSharedDir(t *testing.T) {
 	root := t.TempDir()
 	wt := t.TempDir()
 
-	if err := ApplyCopy(root, wt, false, nil); err != nil {
+	if _, err := ApplyCopy(root, wt, false, nil); err != nil {
 		t.Fatalf("ApplyCopy with missing dir should not error: %v", err)
 	}
 }
@@ -84,7 +84,7 @@ func TestApplySymlinks(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := ApplySymlinks(root, wt, false); err != nil {
+	if _, err := ApplySymlinks(root, wt, false); err != nil {
 		t.Fatalf("ApplySymlinks error: %v", err)
 	}
 
@@ -107,7 +107,7 @@ func TestApplySymlinksDryRun(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := ApplySymlinks(root, wt, true); err != nil {
+	if _, err := ApplySymlinks(root, wt, true); err != nil {
 		t.Fatalf("ApplySymlinks dry-run error: %v", err)
 	}
 
@@ -120,7 +120,7 @@ func TestApplySymlinksMissingDir(t *testing.T) {
 	root := t.TempDir()
 	wt := t.TempDir()
 
-	if err := ApplySymlinks(root, wt, false); err != nil {
+	if _, err := ApplySymlinks(root, wt, false); err != nil {
 		t.Fatalf("ApplySymlinks with missing dir should not error: %v", err)
 	}
 }
@@ -144,7 +144,7 @@ func TestApply(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := Apply(root, wt, false, nil); err != nil {
+	if _, err := Apply(root, wt, false, nil); err != nil {
 		t.Fatalf("Apply error: %v", err)
 	}
 
@@ -173,7 +173,7 @@ func TestApplyCopyWithTemplateVars(t *testing.T) {
 	}
 
 	vars := NewTemplateVars(root, wt, "feature/login")
-	if err := ApplyCopy(root, wt, false, &vars); err != nil {
+	if _, err := ApplyCopy(root, wt, false, &vars); err != nil {
 		t.Fatalf("ApplyCopy with vars error: %v", err)
 	}
 
@@ -206,7 +206,7 @@ func TestApplyCopyNonTemplateFilesCopiedAsIs(t *testing.T) {
 	}
 
 	vars := NewTemplateVars(root, wt, "feature/login")
-	if err := ApplyCopy(root, wt, false, &vars); err != nil {
+	if _, err := ApplyCopy(root, wt, false, &vars); err != nil {
 		t.Fatalf("ApplyCopy error: %v", err)
 	}
 
