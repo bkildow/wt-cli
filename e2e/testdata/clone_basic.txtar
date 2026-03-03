@@ -1,0 +1,18 @@
+[!exec:git] skip 'git not available'
+
+# Create a source repo to clone from
+setup-repo
+
+# Clone it
+exec wt clone $WORK/remote myproject
+
+# Verify project structure
+exists myproject/.worktree.yml
+exists myproject/.bare
+exists myproject/shared/copy
+exists myproject/shared/symlink
+exists myproject/worktrees
+
+# Verify config
+grep 'version: 1' myproject/.worktree.yml
+grep 'git_dir: .bare' myproject/.worktree.yml

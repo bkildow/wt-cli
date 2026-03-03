@@ -1,0 +1,22 @@
+[!exec:git] skip 'git not available'
+
+setup-repo
+setup-project
+
+cd $WORK/project
+
+# Add a worktree
+exec wt add --skip-setup main
+
+# Create shared copy files
+cp $WORK/copiedfile.txt shared/copy/config.json
+
+# Apply to the worktree
+exec wt apply main
+
+# Verify copy
+exists worktrees/main/config.json
+cmp worktrees/main/config.json shared/copy/config.json
+
+-- copiedfile.txt --
+{"key": "value"}

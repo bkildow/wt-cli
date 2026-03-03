@@ -1,0 +1,10 @@
+# wt --help should succeed and show usage
+exec wt --help
+stdout 'A smarter git worktree workflow'
+stdout 'clone'
+stdout 'add'
+stdout 'list'
+
+# wt --version should succeed
+exec wt --version
+stdout 'wt version'

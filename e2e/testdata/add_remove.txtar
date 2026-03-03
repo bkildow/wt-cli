@@ -1,0 +1,33 @@
+[!exec:git] skip 'git not available'
+
+# Set up a project with a remote repo that has extra branches
+setup-repo develop feature/login
+setup-project
+
+cd $WORK/project
+
+# Add a worktree for the default branch
+exec wt add --skip-setup main
+exists worktrees/main
+
+# List should show the worktree
+exec wt list
+stderr 'main'
+
+# Add another worktree
+exec wt add --skip-setup develop
+exists worktrees/develop
+
+# List should show both
+exec wt list
+stderr 'main'
+stderr 'develop'
+
+# Remove one
+exec wt remove develop
+stderr 'Removed worktree'
+! exists worktrees/develop
+
+# List should show only main
+exec wt list
+stderr 'main'

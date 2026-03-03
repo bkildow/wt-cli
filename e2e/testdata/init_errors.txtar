@@ -1,0 +1,4 @@
+# wt init in a directory without .git should fail
+mkdir empty
+cd empty
+! exec wt init

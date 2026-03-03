@@ -1,0 +1,10 @@
+[!exec:git] skip 'git not available'
+
+setup-repo
+setup-project
+
+cd $WORK/project
+
+exec wt add --skip-setup main
+exec wt cd main
+stdout 'worktrees/main'

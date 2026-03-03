@@ -1,0 +1,20 @@
+[!exec:git] skip 'git not available'
+
+# Set up a normal git repo (git identity from setupEnv env vars)
+exec git init myrepo
+cd myrepo
+exec git commit --allow-empty -m 'initial'
+
+# wt init should create scaffold
+exec wt init
+stderr 'Initialized wt project'
+
+# Verify scaffold was created
+exists .worktree.yml
+exists shared/copy
+exists shared/symlink
+exists worktrees
+
+# Config should have correct values
+grep 'version: 1' .worktree.yml
+grep 'worktree_dir: worktrees' .worktree.yml
