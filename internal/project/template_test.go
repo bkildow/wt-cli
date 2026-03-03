@@ -24,7 +24,10 @@ func TestWorktreeIDFromBranch(t *testing.T) {
 }
 
 func TestNewTemplateVars(t *testing.T) {
-	vars := NewTemplateVars("/path/to/worktree", "feature/login")
+	vars := NewTemplateVars("/path/to/project", "/path/to/worktree", "feature/login")
+	if vars.ProjectRoot != "/path/to/project" {
+		t.Errorf("ProjectRoot = %q, want %q", vars.ProjectRoot, "/path/to/project")
+	}
 	if vars.WorktreeID != "feature-login" {
 		t.Errorf("WorktreeID = %q, want %q", vars.WorktreeID, "feature-login")
 	}
@@ -38,6 +41,7 @@ func TestNewTemplateVars(t *testing.T) {
 
 func TestProcessTemplate(t *testing.T) {
 	vars := TemplateVars{
+		ProjectRoot:  "/project",
 		WorktreeID:   "feature-login",
 		WorktreePath: "/project/worktrees/feature-login",
 		BranchName:   "feature/login",
@@ -47,9 +51,11 @@ func TestProcessTemplate(t *testing.T) {
 		input string
 		want  string
 	}{
+		{"root: ${PROJECT_ROOT}", "root: /project"},
 		{"id: ${WORKTREE_ID}", "id: feature-login"},
 		{"path: ${WORKTREE_PATH}", "path: /project/worktrees/feature-login"},
 		{"branch: ${BRANCH_NAME}", "branch: feature/login"},
+		{"bare: ${PROJECT_ROOT}/.bare", "bare: /project/.bare"},
 		{"${WORKTREE_ID}-app", "feature-login-app"},
 		{"no placeholders", "no placeholders"},
 	}

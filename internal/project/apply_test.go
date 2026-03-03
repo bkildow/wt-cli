@@ -167,12 +167,12 @@ func TestApplyCopyWithTemplateVars(t *testing.T) {
 	if err := os.MkdirAll(copyDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	content := "ID=${WORKTREE_ID}\nPATH=${WORKTREE_PATH}\n"
+	content := "ID=${WORKTREE_ID}\nPATH=${WORKTREE_PATH}\nROOT=${PROJECT_ROOT}\n"
 	if err := os.WriteFile(filepath.Join(copyDir, ".env.template"), []byte(content), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
-	vars := NewTemplateVars(wt, "feature/login")
+	vars := NewTemplateVars(root, wt, "feature/login")
 	if err := ApplyCopy(root, wt, false, &vars); err != nil {
 		t.Fatalf("ApplyCopy with vars error: %v", err)
 	}
@@ -185,7 +185,7 @@ func TestApplyCopyWithTemplateVars(t *testing.T) {
 	if err != nil {
 		t.Fatalf(".env not created: %v", err)
 	}
-	want := "ID=feature-login\nPATH=" + wt + "\n"
+	want := "ID=feature-login\nPATH=" + wt + "\nROOT=" + root + "\n"
 	if string(got) != want {
 		t.Errorf(".env content = %q, want %q", got, want)
 	}
@@ -205,7 +205,7 @@ func TestApplyCopyNonTemplateFilesCopiedAsIs(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	vars := NewTemplateVars(wt, "feature/login")
+	vars := NewTemplateVars(root, wt, "feature/login")
 	if err := ApplyCopy(root, wt, false, &vars); err != nil {
 		t.Fatalf("ApplyCopy error: %v", err)
 	}

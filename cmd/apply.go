@@ -54,7 +54,7 @@ func runApply(cmd *cobra.Command, args []string) error {
 	if all {
 		for _, wt := range filtered {
 			ui.Step("Applying to: " + wt.Branch)
-			vars := project.NewTemplateVars(wt.Path, wt.Branch)
+			vars := project.NewTemplateVars(projectRoot, wt.Path, wt.Branch)
 			if err := project.Apply(projectRoot, wt.Path, dry, &vars); err != nil {
 				return err
 			}
@@ -97,7 +97,7 @@ func runApply(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	vars := project.NewTemplateVars(selected.Path, selected.Branch)
+	vars := project.NewTemplateVars(projectRoot, selected.Path, selected.Branch)
 	if err := project.Apply(projectRoot, selected.Path, dry, &vars); err != nil {
 		return err
 	}

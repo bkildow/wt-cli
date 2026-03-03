@@ -89,7 +89,7 @@ func runAdd(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	vars := project.NewTemplateVars(worktreePath, branch)
+	vars := project.NewTemplateVars(projectRoot, worktreePath, branch)
 	if err := project.Apply(projectRoot, worktreePath, dry, &vars); err != nil {
 		return err
 	}

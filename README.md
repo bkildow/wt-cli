@@ -6,7 +6,7 @@ A CLI for managing git worktree-based development workflows. Clone once as a bar
 
 - **Bare-repo workflow** — no `.git` at project root; all worktrees live under `worktrees/`
 - **Shared files** — copy per-worktree configs or symlink heavy directories (node_modules, vendor) once
-- **Template variables** — `${WORKTREE_ID}`, `${BRANCH_NAME}`, etc. substituted in `.template` files
+- **Template variables** — `${PROJECT_ROOT}`, `${WORKTREE_ID}`, `${BRANCH_NAME}`, etc. substituted in `.template` files
 - **Interactive by default** — branch/worktree pickers when arguments are omitted
 - **Setup/teardown hooks** — run commands automatically when creating or removing worktrees
 - **Editor integration** — open worktrees in your preferred editor ($EDITOR, config, or auto-detect)
@@ -243,6 +243,7 @@ Example: `shared/copy/.env.template` → `worktrees/feature-auth/.env`
 
 | Variable | Derivation | Example (branch: `feature/Auth`) |
 |----------|------------|----------------------------------|
+| `${PROJECT_ROOT}` | Absolute project root path | `/path/to/project` |
 | `${WORKTREE_ID}` | Branch lowercased, `/` → `-` | `feature-auth` |
 | `${WORKTREE_PATH}` | Absolute worktree path | `/path/to/worktrees/feature/Auth` |
 | `${BRANCH_NAME}` | Raw branch name | `feature/Auth` |
