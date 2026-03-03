@@ -45,11 +45,10 @@ func listWorktreeNames() ([]string, error) {
 		return nil, err
 	}
 
-	var names []string
-	for _, wt := range worktrees {
-		if !wt.Bare {
-			names = append(names, wt.Branch)
-		}
+	filtered := filterManagedWorktrees(worktrees, projectRoot)
+	names := make([]string, len(filtered))
+	for i, wt := range filtered {
+		names[i] = wt.Branch
 	}
 
 	return names, nil

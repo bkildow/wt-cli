@@ -40,14 +40,10 @@ func runCd(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	// Filter out bare entries and build lookup
-	var filtered []git.WorktreeInfo
-	var names []string
-	for _, wt := range worktrees {
-		if !wt.Bare {
-			filtered = append(filtered, wt)
-			names = append(names, wt.Branch)
-		}
+	filtered := filterManagedWorktrees(worktrees, projectRoot)
+	names := make([]string, len(filtered))
+	for i, wt := range filtered {
+		names[i] = wt.Branch
 	}
 
 	if len(filtered) == 0 {

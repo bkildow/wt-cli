@@ -39,6 +39,7 @@ func init() {
 	rootCmd.PersistentFlags().BoolVar(&ui.Verbose, "verbose", false, "Show git commands being executed")
 	rootCmd.AddCommand(newAgentsCmd())
 	rootCmd.AddCommand(newCloneCmd())
+	rootCmd.AddCommand(newInitCmd())
 	rootCmd.AddCommand(newAddCmd())
 	rootCmd.AddCommand(newListCmd())
 	rootCmd.AddCommand(newRemoveCmd())

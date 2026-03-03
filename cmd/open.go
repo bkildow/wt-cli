@@ -42,12 +42,7 @@ func runOpen(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	var filtered []git.WorktreeInfo
-	for _, wt := range worktrees {
-		if !wt.Bare {
-			filtered = append(filtered, wt)
-		}
-	}
+	filtered := filterManagedWorktrees(worktrees, projectRoot)
 
 	if len(filtered) == 0 {
 		return fmt.Errorf("no worktrees found")

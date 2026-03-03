@@ -91,7 +91,7 @@ func renderAnnotatedConfig(cfg *Config) string {
 		b.WriteString("version: 1\n")
 	}
 
-	b.WriteString("\n# Path to the bare git repository\n")
+	b.WriteString("\n# Path to the git directory (.bare for cloned projects, .git for initialized)\n")
 	if cfg != nil {
 		fmt.Fprintf(&b, "git_dir: %s\n", cfg.GitDir)
 	} else {

@@ -30,13 +30,7 @@ func runList(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	// Filter out bare entries
-	var filtered []git.WorktreeInfo
-	for _, wt := range worktrees {
-		if !wt.Bare {
-			filtered = append(filtered, wt)
-		}
-	}
+	filtered := filterManagedWorktrees(worktrees, projectRoot)
 
 	if len(filtered) == 0 {
 		ui.Info("No worktrees found. Use 'wt add' to create one.")

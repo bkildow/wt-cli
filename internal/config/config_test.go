@@ -293,6 +293,52 @@ func TestWriteAnnotatedWithValues(t *testing.T) {
 	}
 }
 
+func TestLoadConfigWithGitDirDotGit(t *testing.T) {
+	dir := t.TempDir()
+	content := `version: 1
+git_dir: .git
+worktree_dir: worktrees
+`
+	if err := os.WriteFile(filepath.Join(dir, ConfigFileName), []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := Load(dir)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if cfg.GitDir != ".git" {
+		t.Errorf("git_dir = %q, want %q", cfg.GitDir, ".git")
+	}
+	if cfg.WorktreeDir != "worktrees" {
+		t.Errorf("worktree_dir = %q, want %q", cfg.WorktreeDir, "worktrees")
+	}
+}
+
+func TestWriteAnnotatedWithGitDirDotGit(t *testing.T) {
+	dir := t.TempDir()
+
+	cfg := &Config{
+		Version:     1,
+		GitDir:      ".git",
+		WorktreeDir: "worktrees",
+	}
+
+	if err := WriteAnnotatedWithValues(dir, cfg); err != nil {
+		t.Fatalf("WriteAnnotatedWithValues error: %v", err)
+	}
+
+	loaded, err := Load(dir)
+	if err != nil {
+		t.Fatalf("load error: %v", err)
+	}
+
+	if loaded.GitDir != ".git" {
+		t.Errorf("git_dir = %q, want %q", loaded.GitDir, ".git")
+	}
+}
+
 func TestYamlQuote(t *testing.T) {
 	tests := []struct {
 		input string

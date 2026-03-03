@@ -44,15 +44,10 @@ func runPrune(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	var filtered []git.WorktreeInfo
-	for _, wt := range worktrees {
-		if !wt.Bare {
-			filtered = append(filtered, wt)
-		}
-	}
+	filtered := filterManagedWorktrees(worktrees, projectRoot)
 
 	// Resolve current worktree path for comparison
-	currentPath, _ := filepath.EvalSymlinks(cwd)
+	currentPath := resolvePathBest(cwd)
 
 	var pruneable []git.WorktreeInfo
 	for _, wt := range filtered {
@@ -60,8 +55,7 @@ func runPrune(cmd *cobra.Command, args []string) error {
 			continue
 		}
 
-		wtPath, _ := filepath.EvalSymlinks(wt.Path)
-		if wtPath == currentPath {
+		if resolvePathBest(wt.Path) == currentPath {
 			continue
 		}
 
