@@ -1,0 +1,36 @@
+# wt - worktree project configuration
+# https://github.com/bkildow/wt-cli
+
+# Config schema version (do not change)
+version: 1
+
+# Path to the git directory (.bare for cloned projects, .git for initialized)
+git_dir: .git
+
+# Directory name for worktrees (relative to project root)
+worktree_dir: worktrees
+
+# Editor for 'wt open' (e.g. cursor, code, zed)
+# Falls back to $EDITOR, then auto-detects
+# editor: cursor
+
+# Commands to run after creating a new worktree
+# setup:
+#   - npm install
+#   - cp .env.example .env
+
+# Commands to run in parallel after creating a new worktree
+# These run concurrently after serial setup hooks complete
+# parallel_setup:
+#   - npm install
+#   - bundle install
+
+# Commands to run before removing a worktree
+# teardown:
+#   - docker compose down
+
+# Commands to run in parallel before removing a worktree
+# These run concurrently after serial teardown hooks complete
+# parallel_teardown:
+#   - docker compose down
+#   - make clean
