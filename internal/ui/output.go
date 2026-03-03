@@ -1,3 +1,4 @@
+// Package ui provides terminal output helpers and interactive prompts.
 package ui
 
 import (

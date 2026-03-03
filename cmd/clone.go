@@ -91,14 +91,14 @@ func runClone(cmd *cobra.Command, args []string) error {
 	ui.Success("Project created: " + name)
 
 	// Offer to create an initial worktree
-	if err := promptInitialWorktree(ctx, runner, projectRoot, dry); err != nil {
+	if err := promptInitialWorktree(ctx, runner, projectRoot); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func promptInitialWorktree(ctx context.Context, runner *git.Runner, projectRoot string, dry bool) error {
+func promptInitialWorktree(ctx context.Context, runner *git.Runner, projectRoot string) error {
 	branches, err := runner.ListRemoteBranches(ctx)
 	if err != nil {
 		ui.Warning("Could not list remote branches: " + err.Error())

@@ -12,6 +12,8 @@ linters:
     - errorlint
     - misspell
     - unconvert
+    - revive
+    - unparam
   disable:
     - depguard
   settings:
@@ -31,6 +33,11 @@ linters:
         - G301
         - G304
         - G306
+    revive:
+      rules:
+        - name: package-comments
+        - name: exported
+          disabled: true
 
 formatters:
   enable:

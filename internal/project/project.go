@@ -1,3 +1,4 @@
+// Package project provides project-level operations including root detection and scaffold creation.
 package project
 
 import (

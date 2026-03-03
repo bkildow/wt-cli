@@ -1,3 +1,4 @@
+// Package git wraps git operations for bare repo worktree management.
 package git
 
 import (

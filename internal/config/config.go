@@ -1,3 +1,4 @@
+// Package config handles reading and writing .worktree.yml configuration.
 package config
 
 import (
