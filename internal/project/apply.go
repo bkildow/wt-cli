@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/bkildow/wt-cli/internal/ui"
 )
@@ -26,6 +27,8 @@ func ApplyCopy(projectRoot, worktreePath string, dryRun bool, vars *TemplateVars
 	ui.Step("Copying shared files")
 
 	var count int
+	logged := make(map[string]bool)
+	sep := string(filepath.Separator)
 	err := filepath.WalkDir(copyDir, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -40,12 +43,19 @@ func ApplyCopy(projectRoot, worktreePath string, dryRun bool, vars *TemplateVars
 		}
 		dest := filepath.Join(worktreePath, rel)
 
+		// Determine the top-level entry for collapsed logging.
+		topLevel, _, isNested := strings.Cut(rel, sep)
+
 		if dryRun {
-			dryDest := dest
-			if vars != nil && IsTemplateFile(rel) {
-				dryDest = filepath.Join(worktreePath, StripTemplateExt(rel))
+			if isNested {
+				logCopyDir(topLevel, logged, true)
+			} else {
+				dryDest := dest
+				if vars != nil && IsTemplateFile(rel) {
+					dryDest = filepath.Join(worktreePath, StripTemplateExt(rel))
+				}
+				ui.DryRunNotice(fmt.Sprintf("copy %s -> %s", path, dryDest))
 			}
-			ui.DryRunNotice(fmt.Sprintf("copy %s -> %s", path, dryDest))
 			return nil
 		}
 
@@ -72,7 +82,11 @@ func ApplyCopy(projectRoot, worktreePath string, dryRun bool, vars *TemplateVars
 		if err := copyFile(path, dest); err != nil {
 			return err
 		}
-		ui.Info(fmt.Sprintf("  copied %s", rel))
+		if isNested {
+			logCopyDir(topLevel, logged, false)
+		} else {
+			ui.Info(fmt.Sprintf("  copied %s", rel))
+		}
 		count++
 		return nil
 	})
@@ -130,6 +144,19 @@ func Apply(projectRoot, worktreePath string, dryRun bool, vars *TemplateVars) (A
 		return ApplyResult{}, err
 	}
 	return ApplyResult{Copied: copied, Symlinked: symlinked}, nil
+}
+
+// logCopyDir logs a top-level directory copy once, collapsing nested files.
+func logCopyDir(name string, logged map[string]bool, dryRun bool) {
+	if logged[name] {
+		return
+	}
+	if dryRun {
+		ui.DryRunNotice(fmt.Sprintf("copy %s/", name))
+	} else {
+		ui.Info(fmt.Sprintf("  copied %s/", name))
+	}
+	logged[name] = true
 }
 
 func copyFile(src, dst string) error {
