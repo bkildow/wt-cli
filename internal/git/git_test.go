@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/bkildow/wt-cli/internal/ui"
@@ -175,6 +176,11 @@ func TestDryRunMode(t *testing.T) {
 	// WorktreePrune
 	if err := runner.WorktreePrune(ctx); err != nil {
 		t.Errorf("dry-run WorktreePrune returned error: %v", err)
+	}
+
+	// WorktreeRepair
+	if err := runner.WorktreeRepair(ctx); err != nil {
+		t.Errorf("dry-run WorktreeRepair returned error: %v", err)
 	}
 
 	// GetLastCommitAge
@@ -450,6 +456,17 @@ func TestIntegrationCloneAndWorktree(t *testing.T) {
 	// Verify the worktree directory exists
 	if _, err := os.Stat(wtPath); os.IsNotExist(err) {
 		t.Error("worktree directory was not created")
+	}
+
+	// Verify the .git file uses a relative path
+	gitFile := filepath.Join(wtPath, ".git")
+	gitFileContent, err := os.ReadFile(gitFile)
+	if err != nil {
+		t.Fatalf("reading .git file: %v", err)
+	}
+	gitdirLine := strings.TrimSpace(string(gitFileContent))
+	if !strings.HasPrefix(gitdirLine, "gitdir: ../") {
+		t.Errorf(".git file should use relative path, got: %s", gitdirLine)
 	}
 
 	// List worktrees

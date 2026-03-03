@@ -13,6 +13,11 @@ A CLI for managing git worktree-based development workflows. Clone once as a bar
 - **Shell completions** — tab-complete worktree names in bash, zsh, and fish
 - **Dry-run support** — preview every destructive operation with `--dry-run`
 
+## Requirements
+
+- **Go 1.25+** (for building from source)
+- **Git 2.40+** (for relative worktree paths via `--relative-paths`)
+
 ## Install
 
 ```bash
@@ -64,6 +69,7 @@ wt prune
 | `wt prune` | Remove worktrees with fully merged branches |
 | `wt config init` | Generate annotated `.worktree.yml` with documentation |
 | `wt agents` | Print AI agent workflow instructions |
+| `wt repair` | Rewrite worktree paths from absolute to relative |
 | `wt shell-init <shell>` | Print shell startup config (wrapper + completions) |
 | `wt completion <shell>` | Generate shell completion script |
 
@@ -155,6 +161,15 @@ wt prune --force             # Skip confirmation
 ```
 
 Compares branches against the default branch (main/master).
+
+### wt repair
+
+```bash
+wt repair                    # Fix all worktree paths to be relative
+wt repair --dry-run          # Preview without changing anything
+```
+
+Rewrites the bidirectional links between worktrees and `.bare/` to use relative paths. This makes the project directory portable (can be moved/renamed without breaking worktrees). Run this once on projects created before `wt` started using relative paths by default.
 
 ### wt agents
 
