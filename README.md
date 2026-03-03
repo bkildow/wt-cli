@@ -96,6 +96,7 @@ Generates a `.worktree.yml` with documentation comments for every field. If a co
 ```bash
 wt add feature/auth          # Create worktree for branch
 wt add                       # Interactive branch picker
+wt add feature/auth --skip-setup  # Create worktree without running setup hooks
 ```
 
 Detects whether the branch exists remotely or creates a new local branch. Applies shared files and runs setup hooks.
@@ -105,6 +106,7 @@ Detects whether the branch exists remotely or creates a new local branch. Applie
 ```bash
 wt remove feature/auth       # Remove worktree and branch
 wt remove --force            # Skip uncommitted changes check
+wt remove feature/auth --skip-teardown  # Remove without running teardown hooks
 ```
 
 Runs teardown hooks before removing the worktree directory.
@@ -234,6 +236,14 @@ teardown:
 | `editor` | Preferred editor binary name | (auto-detect) |
 | `setup` | Commands to run after creating a worktree | `[]` |
 | `teardown` | Commands to run before removing a worktree | `[]` |
+
+### Setup & Teardown Hooks
+
+Hooks run in the worktree directory via `sh -c`. Each hook runs sequentially; a failing hook is logged but does not prevent subsequent hooks from running.
+
+- **Setup hooks** run after worktree creation and shared file application. If any hook fails, `wt add` reports the error (the worktree is still created).
+- **Teardown hooks** run before worktree removal. Hook failures are logged as warnings and do not prevent removal.
+- Both respect `--dry-run` (prints what would run without executing).
 
 ### Template Variables
 
