@@ -2,41 +2,42 @@
 package ui
 
 import (
-	"fmt"
 	"io"
 	"os"
+
+	lipgloss "charm.land/lipgloss/v2"
 )
 
 var Output io.Writer = os.Stderr
 
 func Success(msg string) {
-	fmt.Fprintln(Output, StyleSuccess.Render("✓ "+msg))
+	lipgloss.Fprintln(Output, StyleSuccess.Render("✓ "+msg))
 }
 
 func Error(msg string) {
-	fmt.Fprintln(Output, StyleError.Render("✗ "+msg))
+	lipgloss.Fprintln(Output, StyleError.Render("✗ "+msg))
 }
 
 func Warning(msg string) {
-	fmt.Fprintln(Output, StyleWarning.Render("⚠ "+msg))
+	lipgloss.Fprintln(Output, StyleWarning.Render("⚠ "+msg))
 }
 
 func Info(msg string) {
-	fmt.Fprintln(Output, StyleInfo.Render(msg))
+	lipgloss.Fprintln(Output, StyleInfo.Render(msg))
 }
 
 func Step(msg string) {
-	fmt.Fprintln(Output, StyleInfo.Render("→ "+msg))
+	lipgloss.Fprintln(Output, StyleInfo.Render("→ "+msg))
 }
 
 func DryRunNotice(action string) {
-	fmt.Fprintln(Output, StyleMuted.Render("[dry-run] "+action))
+	lipgloss.Fprintln(Output, StyleMuted.Render("[dry-run] "+action))
 }
 
 func Command(cmd string) {
-	fmt.Fprintln(Output, StyleCommand.Render("  $ "+cmd))
+	lipgloss.Fprintln(Output, StyleCommand.Render("  $ "+cmd))
 }
 
 func Heading(msg string) {
-	fmt.Fprintln(Output, StyleHeading.Render(msg))
+	lipgloss.Fprintln(Output, StyleHeading.Render(msg))
 }
