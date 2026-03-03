@@ -1,11 +1,8 @@
 package cmd
 
 import (
-	"fmt"
 	"path/filepath"
-	"text/tabwriter"
 
-	lipgloss "charm.land/lipgloss/v2"
 	"github.com/bkildow/wt-cli/internal/git"
 	"github.com/bkildow/wt-cli/internal/project"
 	"github.com/bkildow/wt-cli/internal/ui"
@@ -49,7 +46,7 @@ func runStatus(cmd *cobra.Command, args []string) error {
 
 	ui.Heading("Worktree Status")
 
-	w := tabwriter.NewWriter(ui.Output, 0, 0, 2, ' ', 0)
+	t := ui.NewTable().Headers("BRANCH", "PATH", "COMMIT", "STATUS", "AGE")
 	for _, wt := range filtered {
 		relPath, err := filepath.Rel(projectRoot, wt.Path)
 		if err != nil {
@@ -71,15 +68,13 @@ func runStatus(cmd *cobra.Command, args []string) error {
 			return err
 		}
 
-		status := "clean"
-		color := ui.ColorSuccess
+		styledStatus := ui.StyleSuccess.Render("clean")
 		if dirty {
-			status = "dirty"
-			color = ui.ColorWarning
+			styledStatus = ui.StyleWarning.Render("dirty")
 		}
-		styledStatus := lipgloss.NewStyle().Foreground(color).Render(status)
 
-		fmt.Fprintf(w, "  %s\t%s\t%s\t%s\t%s\n", wt.Branch, relPath, shortHead, styledStatus, age)
+		t.Row(wt.Branch, relPath, shortHead, styledStatus, age)
 	}
-	return w.Flush()
+	ui.PrintTable(t)
+	return nil
 }

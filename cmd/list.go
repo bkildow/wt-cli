@@ -1,9 +1,7 @@
 package cmd
 
 import (
-	"fmt"
 	"path/filepath"
-	"text/tabwriter"
 
 	"github.com/bkildow/wt-cli/internal/git"
 	"github.com/bkildow/wt-cli/internal/project"
@@ -47,7 +45,7 @@ func runList(cmd *cobra.Command, args []string) error {
 
 	ui.Heading("Worktrees")
 
-	w := tabwriter.NewWriter(ui.Output, 0, 0, 2, ' ', 0)
+	t := ui.NewTable().Headers("BRANCH", "PATH", "COMMIT")
 	for _, wt := range filtered {
 		relPath, err := filepath.Rel(projectRoot, wt.Path)
 		if err != nil {
@@ -57,7 +55,8 @@ func runList(cmd *cobra.Command, args []string) error {
 		if len(shortHead) > 7 {
 			shortHead = shortHead[:7]
 		}
-		fmt.Fprintf(w, "  %s\t%s\t%s\n", wt.Branch, relPath, shortHead)
+		t.Row(wt.Branch, relPath, shortHead)
 	}
-	return w.Flush()
+	ui.PrintTable(t)
+	return nil
 }
