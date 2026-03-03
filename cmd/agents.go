@@ -10,9 +10,10 @@ const agentsMarkdown = `# AGENTS.md — AI Workflow Guide for wt
 
 ## Overview
 
-wt is a CLI for git worktree-based development. It wraps a bare git repository
-and creates isolated worktrees under a worktrees/ directory with shared config
-files, symlinks, and template variable substitution.
+wt is a CLI for git worktree-based development. It manages isolated worktrees
+under a worktrees/ directory with shared config files, symlinks, and template
+variable substitution. Projects can be created via wt clone (bare repo) or
+wt init (existing repo).
 
 ## Important: Non-Interactive Usage
 
@@ -32,6 +33,8 @@ prompts.
 
 ## Project Structure
 
+After wt clone (bare repo):
+
     project/
       .bare/              # Bare git repository (no .git at root)
       .worktree.yml       # Project configuration
@@ -41,14 +44,29 @@ prompts.
       worktrees/
         main/             # Each branch gets its own directory
         feature-auth/
-        feature-ui/
+
+After wt init (existing repo):
+
+    project/
+      .git/               # Existing git directory (project root is the main worktree)
+      .worktree.yml       # Project configuration
+      shared/
+        copy/
+        symlink/
+      worktrees/
+        feature-auth/     # Additional worktrees live here
 
 ## Command Reference
 
-### Clone a project
+### Clone a project (bare repo)
 
     wt clone <url> [name]
     wt clone <url> --dry-run          # Preview without executing
+
+### Initialize in an existing repo
+
+    wt init                           # Run from the repo root
+    wt init --dry-run                 # Preview without executing
 
 ### Create a worktree
 
@@ -103,10 +121,17 @@ prompts.
 
 ## Common Workflows
 
-### Starting a new project
+### Starting a new project (clone)
 
     wt clone git@github.com:org/repo.git
     cd repo
+    wt add feature/my-feature
+    cd "$(wt cd feature/my-feature)"
+
+### Adding wt to an existing repo
+
+    cd existing-repo
+    wt init
     wt add feature/my-feature
     cd "$(wt cd feature/my-feature)"
 
@@ -132,19 +157,27 @@ prompts.
 ## Configuration (.worktree.yml)
 
     version: 1
-    git_dir: .bare
+    git_dir: .bare                    # .bare for clone, .git for init
+    worktree_dir: worktrees
     editor: cursor
     setup:
       - "npm install"
+    parallel_setup:
+      - "bundle install"
     teardown:
       - "docker compose down"
+    parallel_teardown:
+      - "make clean"
 
 Fields:
 - version: Config version (always 1)
-- git_dir: Path to bare repository (default: .bare)
+- git_dir: Path to git directory (.bare for cloned, .git for initialized)
+- worktree_dir: Directory for worktrees (default: worktrees)
 - editor: Preferred editor binary name (default: auto-detect)
-- setup: Commands run after creating a worktree
-- teardown: Commands run before removing a worktree
+- setup: Commands run sequentially after creating a worktree
+- parallel_setup: Commands run concurrently after setup completes
+- teardown: Commands run sequentially before removing a worktree
+- parallel_teardown: Commands run concurrently after teardown completes
 
 ## Template Variables
 
@@ -164,7 +197,8 @@ Available variables:
 
 1. wt cd prints a path — it does not change directory. Always use:
    cd "$(wt cd <name>)"
-2. There is no .git at the project root. The bare repo lives at .bare/.
+2. For cloned projects, there is no .git at the project root (bare repo at .bare/).
+   For initialized projects, .git exists and the project root is the main worktree.
 3. Use --force with wt remove and wt prune to skip interactive confirmation.
 4. Use --dry-run to safely preview any destructive operation.
 5. The project root is identified by .worktree.yml — look for this file.
