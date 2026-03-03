@@ -12,6 +12,7 @@ func TestLoadValidConfig(t *testing.T) {
 	dir := t.TempDir()
 	content := `version: 1
 git_dir: .bare
+worktree_dir: trees
 setup:
   - npm install
 parallel_setup:
@@ -37,6 +38,9 @@ editor: cursor
 	}
 	if cfg.GitDir != ".bare" {
 		t.Errorf("git_dir = %q, want %q", cfg.GitDir, ".bare")
+	}
+	if cfg.WorktreeDir != "trees" {
+		t.Errorf("worktree_dir = %q, want %q", cfg.WorktreeDir, "trees")
 	}
 	if len(cfg.Setup) != 1 || cfg.Setup[0] != "npm install" {
 		t.Errorf("setup = %v, want [npm install]", cfg.Setup)
@@ -75,6 +79,9 @@ func TestLoadMinimalConfig(t *testing.T) {
 	if cfg.GitDir != DefaultGitDir {
 		t.Errorf("git_dir = %q, want default %q", cfg.GitDir, DefaultGitDir)
 	}
+	if cfg.WorktreeDir != DefaultWorktreeDir {
+		t.Errorf("worktree_dir = %q, want default %q", cfg.WorktreeDir, DefaultWorktreeDir)
+	}
 }
 
 func TestLoadMissingFile(t *testing.T) {
@@ -101,11 +108,12 @@ func TestLoadInvalidYAML(t *testing.T) {
 func TestSaveAndLoadRoundTrip(t *testing.T) {
 	dir := t.TempDir()
 	original := &Config{
-		Version:  1,
-		GitDir:   ".bare",
-		Setup:    []string{"make build", "make test"},
-		Teardown: []string{"make clean"},
-		Editor:   "nvim",
+		Version:     1,
+		GitDir:      ".bare",
+		WorktreeDir: "trees",
+		Setup:       []string{"make build", "make test"},
+		Teardown:    []string{"make clean"},
+		Editor:      "nvim",
 	}
 
 	if err := original.Save(dir); err != nil {
@@ -122,6 +130,9 @@ func TestSaveAndLoadRoundTrip(t *testing.T) {
 	}
 	if loaded.GitDir != original.GitDir {
 		t.Errorf("git_dir = %q, want %q", loaded.GitDir, original.GitDir)
+	}
+	if loaded.WorktreeDir != original.WorktreeDir {
+		t.Errorf("worktree_dir = %q, want %q", loaded.WorktreeDir, original.WorktreeDir)
 	}
 	if len(loaded.Setup) != len(original.Setup) {
 		t.Errorf("setup len = %d, want %d", len(loaded.Setup), len(original.Setup))
@@ -178,6 +189,9 @@ func TestWriteAnnotated(t *testing.T) {
 	if !strings.Contains(content, "git_dir: .bare") {
 		t.Error("missing git_dir default")
 	}
+	if !strings.Contains(content, "worktree_dir: worktrees") {
+		t.Error("missing worktree_dir default")
+	}
 
 	// Optional fields should be commented out
 	if !strings.Contains(content, "# editor: cursor") {
@@ -207,17 +221,21 @@ func TestWriteAnnotated(t *testing.T) {
 	if cfg.GitDir != DefaultGitDir {
 		t.Errorf("git_dir = %q, want %q", cfg.GitDir, DefaultGitDir)
 	}
+	if cfg.WorktreeDir != DefaultWorktreeDir {
+		t.Errorf("worktree_dir = %q, want %q", cfg.WorktreeDir, DefaultWorktreeDir)
+	}
 }
 
 func TestWriteAnnotatedWithValues(t *testing.T) {
 	dir := t.TempDir()
 
 	existing := &Config{
-		Version:  1,
-		GitDir:   ".bare",
-		Setup:    []string{"npm install", "cp .env.example .env"},
-		Teardown: []string{"docker compose down"},
-		Editor:   "cursor",
+		Version:     1,
+		GitDir:      ".bare",
+		WorktreeDir: "trees",
+		Setup:       []string{"npm install", "cp .env.example .env"},
+		Teardown:    []string{"docker compose down"},
+		Editor:      "cursor",
 	}
 
 	if err := WriteAnnotatedWithValues(dir, existing); err != nil {
@@ -248,10 +266,18 @@ func TestWriteAnnotatedWithValues(t *testing.T) {
 		t.Error("missing setup section")
 	}
 
+	// worktree_dir should be rendered with custom value
+	if !strings.Contains(content, "worktree_dir: trees") {
+		t.Error("missing worktree_dir custom value")
+	}
+
 	// Should be loadable and round-trip correctly
 	cfg, err := Load(dir)
 	if err != nil {
 		t.Fatalf("annotated config with values should be loadable: %v", err)
+	}
+	if cfg.WorktreeDir != "trees" {
+		t.Errorf("worktree_dir = %q, want %q", cfg.WorktreeDir, "trees")
 	}
 	if cfg.Editor != "cursor" {
 		t.Errorf("editor = %q, want %q", cfg.Editor, "cursor")

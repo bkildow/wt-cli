@@ -12,8 +12,9 @@ import (
 )
 
 const (
-	ConfigFileName = ".worktree.yml"
-	DefaultGitDir  = ".bare"
+	ConfigFileName     = ".worktree.yml"
+	DefaultGitDir      = ".bare"
+	DefaultWorktreeDir = "worktrees"
 )
 
 var (
@@ -24,6 +25,7 @@ var (
 type Config struct {
 	Version          int      `yaml:"version"`
 	GitDir           string   `yaml:"git_dir"`
+	WorktreeDir      string   `yaml:"worktree_dir"`
 	Setup            []string `yaml:"setup,omitempty"`
 	ParallelSetup    []string `yaml:"parallel_setup,omitempty"`
 	Teardown         []string `yaml:"teardown,omitempty"`
@@ -33,8 +35,9 @@ type Config struct {
 
 func DefaultConfig() Config {
 	return Config{
-		Version: 1,
-		GitDir:  DefaultGitDir,
+		Version:     1,
+		GitDir:      DefaultGitDir,
+		WorktreeDir: DefaultWorktreeDir,
 	}
 }
 
@@ -93,6 +96,13 @@ func renderAnnotatedConfig(cfg *Config) string {
 		fmt.Fprintf(&b, "git_dir: %s\n", cfg.GitDir)
 	} else {
 		fmt.Fprintf(&b, "git_dir: %s\n", DefaultGitDir)
+	}
+
+	b.WriteString("\n# Directory name for worktrees (relative to project root)\n")
+	if cfg != nil {
+		fmt.Fprintf(&b, "worktree_dir: %s\n", cfg.WorktreeDir)
+	} else {
+		fmt.Fprintf(&b, "worktree_dir: %s\n", DefaultWorktreeDir)
 	}
 
 	b.WriteString("\n# Editor for 'wt open' (e.g. cursor, code, zed)\n")

@@ -25,11 +25,11 @@ func FindRoot(startDir string) (string, error) {
 	}
 }
 
-func CreateScaffold(projectRoot string, dryRun bool) error {
+func CreateScaffold(projectRoot string, cfg *config.Config, dryRun bool) error {
 	dirs := []string{
 		filepath.Join(projectRoot, "shared", "copy"),
 		filepath.Join(projectRoot, "shared", "symlink"),
-		filepath.Join(projectRoot, "worktrees"),
+		WorktreesPath(projectRoot, cfg),
 	}
 
 	for _, dir := range dirs {
@@ -61,4 +61,8 @@ func RepoNameFromURL(url string) string {
 
 func GitDirPath(projectRoot string, cfg *config.Config) string {
 	return filepath.Join(projectRoot, cfg.GitDir)
+}
+
+func WorktreesPath(projectRoot string, cfg *config.Config) string {
+	return filepath.Join(projectRoot, cfg.WorktreeDir)
 }

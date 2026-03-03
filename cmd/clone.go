@@ -73,8 +73,9 @@ func runClone(cmd *cobra.Command, args []string) error {
 	}
 
 	// Create scaffold directories
+	cfg := config.DefaultConfig()
 	ui.Step("Creating project scaffold")
-	if err := project.CreateScaffold(projectRoot, dry); err != nil {
+	if err := project.CreateScaffold(projectRoot, &cfg, dry); err != nil {
 		return err
 	}
 
@@ -91,14 +92,14 @@ func runClone(cmd *cobra.Command, args []string) error {
 	ui.Success("Project created: " + name)
 
 	// Offer to create an initial worktree
-	if err := promptInitialWorktree(ctx, runner, projectRoot); err != nil {
+	if err := promptInitialWorktree(ctx, runner, projectRoot, &cfg); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func promptInitialWorktree(ctx context.Context, runner *git.Runner, projectRoot string) error {
+func promptInitialWorktree(ctx context.Context, runner *git.Runner, projectRoot string, cfg *config.Config) error {
 	branches, err := runner.ListRemoteBranches(ctx)
 	if err != nil {
 		ui.Warning("Could not list remote branches: " + err.Error())
@@ -124,12 +125,12 @@ func promptInitialWorktree(ctx context.Context, runner *git.Runner, projectRoot 
 		return nil // User cancelled
 	}
 
-	wtPath := filepath.Join(projectRoot, "worktrees", branch)
+	wtPath := filepath.Join(project.WorktreesPath(projectRoot, cfg), branch)
 	ui.Step("Adding worktree for branch: " + branch)
 	if err := runner.WorktreeAdd(ctx, wtPath, branch); err != nil {
 		return err
 	}
 
-	ui.Success("Worktree created: worktrees/" + branch)
+	ui.Success(fmt.Sprintf("Worktree created: %s/%s", cfg.WorktreeDir, branch))
 	return nil
 }

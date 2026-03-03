@@ -68,10 +68,10 @@ func runAdd(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	worktreePath := filepath.Join(projectRoot, "worktrees", branch)
+	worktreePath := filepath.Join(project.WorktreesPath(projectRoot, cfg), branch)
 
 	if _, err := os.Stat(worktreePath); err == nil {
-		return fmt.Errorf("worktree already exists: worktrees/%s", branch)
+		return fmt.Errorf("worktree already exists: %s/%s", cfg.WorktreeDir, branch)
 	}
 
 	hasRemote, err := runner.HasRemoteBranch(ctx, branch)
@@ -105,12 +105,12 @@ func runAdd(cmd *cobra.Command, args []string) error {
 		}
 	}
 
+	msg := fmt.Sprintf("Worktree created: %s/%s (%d copied, %d symlinked)",
+		cfg.WorktreeDir, branch, result.Copied, result.Symlinked)
 	if setupErr != nil {
-		ui.Warning(fmt.Sprintf("Worktree created: worktrees/%s (%d copied, %d symlinked) — setup hooks failed",
-			branch, result.Copied, result.Symlinked))
+		ui.Warning(msg + " — setup hooks failed")
 	} else {
-		ui.Success(fmt.Sprintf("Worktree created: worktrees/%s (%d copied, %d symlinked)",
-			branch, result.Copied, result.Symlinked))
+		ui.Success(msg)
 	}
 	fmt.Println(worktreePath)
 	return nil

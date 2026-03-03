@@ -68,8 +68,9 @@ func TestFindRootNotFound(t *testing.T) {
 
 func TestCreateScaffold(t *testing.T) {
 	root := t.TempDir()
+	cfg := &config.Config{WorktreeDir: config.DefaultWorktreeDir}
 
-	if err := CreateScaffold(root, false); err != nil {
+	if err := CreateScaffold(root, cfg, false); err != nil {
 		t.Fatalf("CreateScaffold error: %v", err)
 	}
 
@@ -93,8 +94,9 @@ func TestCreateScaffold(t *testing.T) {
 
 func TestCreateScaffoldDryRun(t *testing.T) {
 	root := t.TempDir()
+	cfg := &config.Config{WorktreeDir: config.DefaultWorktreeDir}
 
-	if err := CreateScaffold(root, true); err != nil {
+	if err := CreateScaffold(root, cfg, true); err != nil {
 		t.Fatalf("CreateScaffold dry-run error: %v", err)
 	}
 
@@ -118,5 +120,38 @@ func TestGitDirPath(t *testing.T) {
 	want := filepath.Join(root, ".bare")
 	if got != want {
 		t.Errorf("GitDirPath = %q, want %q", got, want)
+	}
+}
+
+func TestWorktreesPath(t *testing.T) {
+	cfg := &config.Config{WorktreeDir: "trees"}
+	root := "/home/user/project"
+	got := WorktreesPath(root, cfg)
+	want := filepath.Join(root, "trees")
+	if got != want {
+		t.Errorf("WorktreesPath = %q, want %q", got, want)
+	}
+}
+
+func TestCreateScaffoldCustomDir(t *testing.T) {
+	root := t.TempDir()
+	cfg := &config.Config{WorktreeDir: "trees"}
+
+	if err := CreateScaffold(root, cfg, false); err != nil {
+		t.Fatalf("CreateScaffold error: %v", err)
+	}
+
+	// Custom dir should exist
+	info, err := os.Stat(filepath.Join(root, "trees"))
+	if err != nil {
+		t.Fatalf("custom worktree dir not created: %v", err)
+	}
+	if !info.IsDir() {
+		t.Error("custom worktree dir is not a directory")
+	}
+
+	// Default "worktrees" should NOT exist
+	if _, err := os.Stat(filepath.Join(root, "worktrees")); err == nil {
+		t.Error("default 'worktrees' dir should not be created when custom dir is set")
 	}
 }
