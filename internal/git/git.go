@@ -31,7 +31,6 @@ type Git interface {
 	WorktreeAddNew(ctx context.Context, path, branch string) error
 	WorktreeRemove(ctx context.Context, path string, force bool) error
 	WorktreeList(ctx context.Context) ([]WorktreeInfo, error)
-	WorktreeRepair(ctx context.Context) error
 	WorktreePrune(ctx context.Context) error
 	BranchDelete(ctx context.Context, branch string, force bool) error
 	IsWorktreeDirty(ctx context.Context, worktreePath string) (bool, error)
@@ -158,11 +157,6 @@ func (r *Runner) WorktreeAdd(ctx context.Context, path, branch string) error {
 
 func (r *Runner) WorktreeAddNew(ctx context.Context, path, branch string) error {
 	_, err := r.Run(ctx, "worktree", "add", "--relative-paths", "-b", branch, path, "HEAD")
-	return err
-}
-
-func (r *Runner) WorktreeRepair(ctx context.Context) error {
-	_, err := r.Run(ctx, "worktree", "repair", "--relative-paths")
 	return err
 }
 

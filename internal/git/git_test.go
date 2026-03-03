@@ -178,11 +178,6 @@ func TestDryRunMode(t *testing.T) {
 		t.Errorf("dry-run WorktreePrune returned error: %v", err)
 	}
 
-	// WorktreeRepair
-	if err := runner.WorktreeRepair(ctx); err != nil {
-		t.Errorf("dry-run WorktreeRepair returned error: %v", err)
-	}
-
 	// GetLastCommitAge
 	age, err := runner.GetLastCommitAge(ctx, "/tmp/wt")
 	if err != nil {
