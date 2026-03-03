@@ -19,6 +19,7 @@ func newPruneCmd() *cobra.Command {
 		RunE:  runPrune,
 	}
 	cmd.Flags().Bool("force", false, "Skip confirmation prompt")
+	cmd.Flags().Bool("skip-teardown", false, "Skip running teardown hooks before removing worktrees")
 	return cmd
 }
 
@@ -105,8 +106,19 @@ func runPrune(cmd *cobra.Command, args []string) error {
 		}
 	}
 
+	skipTeardown, _ := cmd.Flags().GetBool("skip-teardown")
+
 	var removed int
 	for _, wt := range pruneable {
+		if !skipTeardown {
+			if err := project.RunTeardownHooks(ctx, cfg, wt.Path, IsDryRun()); err != nil {
+				ui.Warning("Teardown hooks failed for " + wt.Branch + ": " + err.Error())
+			}
+			if err := project.RunParallelTeardownHooks(ctx, cfg, wt.Path, IsDryRun()); err != nil {
+				ui.Warning("Parallel teardown hooks failed for " + wt.Branch + ": " + err.Error())
+			}
+		}
+
 		ui.Step("Removing worktree: " + wt.Branch)
 		if err := runner.WorktreeRemove(ctx, wt.Path, false); err != nil {
 			ui.Warning(fmt.Sprintf("Could not remove worktree %s: %s", wt.Branch, err))
