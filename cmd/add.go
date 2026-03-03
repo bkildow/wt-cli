@@ -32,6 +32,11 @@ func runAdd(cmd *cobra.Command, args []string) error {
 	gitDir := project.GitDirPath(projectRoot, cfg)
 	runner := git.NewRunner(gitDir, dry)
 
+	ui.Step("Fetching all remotes")
+	if err := runner.FetchAll(ctx); err != nil {
+		return err
+	}
+
 	var branch string
 	if len(args) > 0 {
 		branch = args[0]
