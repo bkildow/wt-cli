@@ -3,8 +3,8 @@ package ui
 import (
 	"errors"
 
-	"github.com/charmbracelet/bubbles/key"
-	"github.com/charmbracelet/huh"
+	"charm.land/bubbles/v2/key"
+	"charm.land/huh/v2"
 )
 
 type Prompter interface {
@@ -26,6 +26,16 @@ func wtKeyMap() *huh.KeyMap {
 	return km
 }
 
+// runForm wraps a field in a standard wt form and runs it.
+func runForm(fields ...huh.Field) error {
+	return huh.NewForm(huh.NewGroup(fields...)).
+		WithTheme(WtTheme()).
+		WithKeyMap(wtKeyMap()).
+		WithShowHelp(true).
+		WithOutput(Output).
+		Run()
+}
+
 func selectHeight(itemCount int) int {
 	if itemCount <= 20 {
 		return 0
@@ -33,81 +43,37 @@ func selectHeight(itemCount int) int {
 	return 22
 }
 
+func selectFromStrings(title string, items []string) (string, error) {
+	var selected string
+	opts := make([]huh.Option[string], len(items))
+	for i, v := range items {
+		opts[i] = huh.NewOption(v, v)
+	}
+
+	field := huh.NewSelect[string]().
+		Title(title).
+		Options(opts...)
+
+	if h := selectHeight(len(opts)); h > 0 {
+		field = field.Height(h)
+	}
+	field = field.Value(&selected)
+
+	return selected, runForm(field)
+}
+
 type InteractivePrompter struct{}
 
 func (p *InteractivePrompter) SelectBranch(branches []string) (string, error) {
-	var selected string
-	opts := make([]huh.Option[string], len(branches))
-	for i, b := range branches {
-		opts[i] = huh.NewOption(b, b)
-	}
-
-	field := huh.NewSelect[string]().
-		Title("Select a branch").
-		Options(opts...)
-
-	if h := selectHeight(len(opts)); h > 0 {
-		field = field.Height(h)
-	}
-	field = field.Value(&selected)
-
-	err := huh.NewForm(huh.NewGroup(field)).
-		WithTheme(WtTheme()).
-		WithKeyMap(wtKeyMap()).
-		WithShowHelp(true).
-		Run()
-
-	return selected, err
+	return selectFromStrings("Select a branch", branches)
 }
 
 func (p *InteractivePrompter) SelectWorktree(worktrees []string) (string, error) {
-	var selected string
-	opts := make([]huh.Option[string], len(worktrees))
-	for i, w := range worktrees {
-		opts[i] = huh.NewOption(w, w)
-	}
-
-	field := huh.NewSelect[string]().
-		Title("Select a worktree").
-		Options(opts...)
-
-	if h := selectHeight(len(opts)); h > 0 {
-		field = field.Height(h)
-	}
-	field = field.Value(&selected)
-
-	err := huh.NewForm(huh.NewGroup(field)).
-		WithTheme(WtTheme()).
-		WithKeyMap(wtKeyMap()).
-		WithShowHelp(true).
-		Run()
-
-	return selected, err
+	return selectFromStrings("Select a worktree", worktrees)
 }
 
 func (p *InteractivePrompter) SelectEditor(editors []string) (string, error) {
-	var selected string
-	opts := make([]huh.Option[string], len(editors))
-	for i, e := range editors {
-		opts[i] = huh.NewOption(e, e)
-	}
-
-	field := huh.NewSelect[string]().
-		Title("Select an editor").
-		Options(opts...)
-
-	if h := selectHeight(len(opts)); h > 0 {
-		field = field.Height(h)
-	}
-	field = field.Value(&selected)
-
-	err := huh.NewForm(huh.NewGroup(field)).
-		WithTheme(WtTheme()).
-		WithKeyMap(wtKeyMap()).
-		WithShowHelp(true).
-		Run()
-
-	return selected, err
+	return selectFromStrings("Select an editor", editors)
 }
 
 func (p *InteractivePrompter) Confirm(title string) (bool, error) {
@@ -116,13 +82,7 @@ func (p *InteractivePrompter) Confirm(title string) (bool, error) {
 		Title(title).
 		Value(&confirmed)
 
-	err := huh.NewForm(huh.NewGroup(field)).
-		WithTheme(WtTheme()).
-		WithKeyMap(wtKeyMap()).
-		WithShowHelp(true).
-		Run()
-
-	return confirmed, err
+	return confirmed, runForm(field)
 }
 
 func (p *InteractivePrompter) InputString(title, placeholder string) (string, error) {
@@ -132,11 +92,5 @@ func (p *InteractivePrompter) InputString(title, placeholder string) (string, er
 		Placeholder(placeholder).
 		Value(&value)
 
-	err := huh.NewForm(huh.NewGroup(field)).
-		WithTheme(WtTheme()).
-		WithKeyMap(wtKeyMap()).
-		WithShowHelp(true).
-		Run()
-
-	return value, err
+	return value, runForm(field)
 }

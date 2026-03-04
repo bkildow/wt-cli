@@ -7,8 +7,8 @@ import (
 
 	lipgloss "charm.land/lipgloss/v2"
 	catppuccin "github.com/catppuccin/go"
-	"github.com/charmbracelet/huh"
-	lipglossv1 "github.com/charmbracelet/lipgloss"
+
+	"charm.land/huh/v2"
 )
 
 // theme holds the semantic colors used throughout wt output.
@@ -99,12 +99,14 @@ var themes = map[string]theme{
 	},
 }
 
+const defaultTheme = "snazzy"
+
 // activeTheme tracks the currently applied theme name for WtTheme.
-var activeTheme = "snazzy"
+var activeTheme = defaultTheme
 
 func init() {
 	// "default" is an alias for snazzy so existing configs/env vars still work.
-	themes["default"] = themes["snazzy"]
+	themes["default"] = themes[defaultTheme]
 }
 
 // ApplyTheme looks up a theme by name and reassigns all Color*/Style* package
@@ -114,7 +116,7 @@ func ApplyTheme(name string) {
 	if !ok {
 		fmt.Fprintf(Output, "wt: unknown theme %q (available: %s)\n",
 			name, strings.Join(ThemeNames(), ", "))
-		name = "snazzy"
+		name = defaultTheme
 		t = themes[name]
 	}
 
@@ -148,16 +150,41 @@ func ThemeNames() []string {
 	return names
 }
 
-// WtTheme returns a huh theme customised to match the active wt palette.
-func WtTheme() *huh.Theme {
-	t := huh.ThemeCharm()
+// wtThemeCache implements huh.Theme with per-isDark caching so the ~70 style
+// operations in buildStyles are not repeated on every render frame.
+type wtThemeCache struct {
+	name  string      // theme name at creation time
+	light *huh.Styles // cached for isDark=false
+	dark  *huh.Styles // cached for isDark=true
+}
 
-	active := themes[activeTheme]
-	accent := lipglossv1.Color(active.accent())
-	heading := lipglossv1.Color(active.heading())
-	errC := lipglossv1.Color(active.Error)
-	success := lipglossv1.Color(active.Success)
-	muted := lipglossv1.Color(active.Muted)
+func (c *wtThemeCache) Theme(isDark bool) *huh.Styles {
+	if isDark {
+		if c.dark == nil {
+			c.dark = buildStyles(c.name, true)
+		}
+		return c.dark
+	}
+	if c.light == nil {
+		c.light = buildStyles(c.name, false)
+	}
+	return c.light
+}
+
+// WtTheme returns a huh theme customised to match the active wt palette.
+func WtTheme() huh.Theme {
+	return &wtThemeCache{name: activeTheme}
+}
+
+func buildStyles(themeName string, isDark bool) *huh.Styles {
+	t := huh.ThemeCharm(isDark)
+
+	active := themes[themeName]
+	accent := lipgloss.Color(active.accent())
+	heading := lipgloss.Color(active.heading())
+	errC := lipgloss.Color(active.Error)
+	success := lipgloss.Color(active.Success)
+	muted := lipgloss.Color(active.Muted)
 
 	// --- Focused field styles ---
 
