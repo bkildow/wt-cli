@@ -14,36 +14,36 @@ var (
 )
 
 func Success(msg string) {
-	lipgloss.Fprintln(Output, StyleSuccess.Render("✓ "+msg))
+	_, _ = lipgloss.Fprintln(Output, StyleSuccess.Render("✓ "+msg))
 }
 
 func Error(msg string) {
-	lipgloss.Fprintln(Output, StyleError.Render("✗ "+msg))
+	_, _ = lipgloss.Fprintln(Output, StyleError.Render("✗ "+msg))
 }
 
 func Warning(msg string) {
-	lipgloss.Fprintln(Output, StyleWarning.Render("⚠ "+msg))
+	_, _ = lipgloss.Fprintln(Output, StyleWarning.Render("⚠ "+msg))
 }
 
 func Info(msg string) {
-	lipgloss.Fprintln(Output, StyleInfo.Render(msg))
+	_, _ = lipgloss.Fprintln(Output, StyleInfo.Render(msg))
 }
 
 func Step(msg string) {
-	lipgloss.Fprintln(Output, StyleInfo.Render("→ "+msg))
+	_, _ = lipgloss.Fprintln(Output, StyleInfo.Render("→ "+msg))
 }
 
 func DryRunNotice(action string) {
-	lipgloss.Fprintln(Output, StyleMuted.Render("[dry-run] "+action))
+	_, _ = lipgloss.Fprintln(Output, StyleMuted.Render("[dry-run] "+action))
 }
 
 func Command(cmd string) {
 	if !Verbose {
 		return
 	}
-	lipgloss.Fprintln(Output, StyleCommand.Render("  $ "+cmd))
+	_, _ = lipgloss.Fprintln(Output, StyleCommand.Render("  $ "+cmd))
 }
 
 func Heading(msg string) {
-	lipgloss.Fprintln(Output, StyleHeading.Render(msg))
+	_, _ = lipgloss.Fprintln(Output, StyleHeading.Render(msg))
 }
