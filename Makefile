@@ -1,14 +1,22 @@
 BINARY := wt
 
+VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
+COMMIT  ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo none)
+DATE    ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
+LDFLAGS := -s -w \
+	-X github.com/bkildow/wt-cli/cmd.version=$(VERSION) \
+	-X github.com/bkildow/wt-cli/cmd.commit=$(COMMIT) \
+	-X github.com/bkildow/wt-cli/cmd.date=$(DATE)
+
 .DEFAULT_GOAL := build
 
 .PHONY: build install test test-short e2e vet fmt clean dev
 
 build:
-	go build -o $(BINARY) ./cmd/wt
+	go build -ldflags '$(LDFLAGS)' -o $(BINARY) ./cmd/wt
 
 install:
-	go install ./cmd/wt
+	go install -ldflags '$(LDFLAGS)' ./cmd/wt
 
 test:
 	go test ./...

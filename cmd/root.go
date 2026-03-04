@@ -2,6 +2,7 @@
 package cmd
 
 import (
+	"fmt"
 	"os"
 
 	lipgloss "charm.land/lipgloss/v2"
@@ -11,7 +12,11 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var version = "dev"
+var (
+	version = "dev"
+	commit  = "none"
+	date    = "unknown"
+)
 
 var dryRun bool
 
@@ -24,6 +29,8 @@ var rootCmd = &cobra.Command{
 }
 
 func init() {
+	rootCmd.Version = fmt.Sprintf("%s (commit %s, built %s)", version, commit, date)
+
 	// Detect color capabilities against stderr so colors work even when
 	// stdout is piped (e.g. wt cd under the shell wrapper function).
 	//
