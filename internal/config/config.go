@@ -33,7 +33,6 @@ type Config struct {
 	Teardown         []string `yaml:"teardown,omitempty"`
 	ParallelTeardown []string `yaml:"parallel_teardown,omitempty"`
 	Editor           string   `yaml:"editor,omitempty"`
-	Theme            string   `yaml:"theme,omitempty"`
 }
 
 func DefaultConfig() Config {
@@ -122,16 +121,6 @@ func renderAnnotatedConfig(cfg *Config) string {
 		fmt.Fprintf(&b, "editor: %s\n", cfg.Editor)
 	} else {
 		b.WriteString("# editor: cursor\n")
-	}
-
-	b.WriteString("\n# Color theme for wt output\n")
-	b.WriteString("# Available: default, catppuccin-mocha, catppuccin-latte, catppuccin-frappe,\n")
-	b.WriteString("#   catppuccin-macchiato, snazzy, dracula, nord, gruvbox\n")
-	b.WriteString("# Can also be set globally via WT_THEME env var\n")
-	if cfg != nil && cfg.Theme != "" {
-		fmt.Fprintf(&b, "theme: %s\n", cfg.Theme)
-	} else {
-		b.WriteString("# theme: catppuccin-mocha\n")
 	}
 
 	b.WriteString("\n# Commands to run after creating a new worktree\n")

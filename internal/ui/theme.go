@@ -100,7 +100,12 @@ var themes = map[string]theme{
 }
 
 // activeTheme tracks the currently applied theme name for WtTheme.
-var activeTheme = "default"
+var activeTheme = "snazzy"
+
+func init() {
+	// "default" is an alias for snazzy so existing configs/env vars still work.
+	themes["default"] = themes["snazzy"]
+}
 
 // ApplyTheme looks up a theme by name and reassigns all Color*/Style* package
 // vars. Unknown names print a warning and fall back to "default".
@@ -109,7 +114,7 @@ func ApplyTheme(name string) {
 	if !ok {
 		fmt.Fprintf(Output, "wt: unknown theme %q (available: %s)\n",
 			name, strings.Join(ThemeNames(), ", "))
-		name = "default"
+		name = "snazzy"
 		t = themes[name]
 	}
 

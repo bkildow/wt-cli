@@ -4,7 +4,7 @@ import "charm.land/lipgloss/v2"
 
 // defaultTheme is a package-level reference to avoid map lookups at init time.
 // These vars are reassigned at runtime by ApplyTheme().
-var dt = themes["default"]
+var dt = themes["snazzy"]
 
 var (
 	ColorSuccess = lipgloss.Color(dt.Success)
@@ -19,6 +19,6 @@ var (
 	StyleInfo    = lipgloss.NewStyle().Foreground(ColorInfo)
 	StyleMuted   = lipgloss.NewStyle().Foreground(ColorMuted)
 	StyleCommand = lipgloss.NewStyle().Foreground(ColorMuted).Italic(true)
-	StylePath    = lipgloss.NewStyle().Foreground(ColorInfo).Bold(true)
-	StyleHeading = lipgloss.NewStyle().Foreground(ColorInfo).Bold(true)
+	StylePath    = lipgloss.NewStyle().Foreground(lipgloss.Color(dt.heading())).Bold(true)
+	StyleHeading = lipgloss.NewStyle().Foreground(lipgloss.Color(dt.heading())).Bold(true)
 )

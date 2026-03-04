@@ -6,8 +6,6 @@ import (
 	"os"
 
 	lipgloss "charm.land/lipgloss/v2"
-	"github.com/bkildow/wt-cli/internal/config"
-	"github.com/bkildow/wt-cli/internal/project"
 	"github.com/bkildow/wt-cli/internal/ui"
 	"github.com/charmbracelet/colorprofile"
 	lipglossv1 "github.com/charmbracelet/lipgloss"
@@ -29,26 +27,7 @@ var rootCmd = &cobra.Command{
 	SilenceUsage:  true,
 	SilenceErrors: true,
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-		theme := ""
-
-		// Try project config first.
-		cwd, err := os.Getwd()
-		if err == nil {
-			if root, err := project.FindRoot(cwd); err == nil {
-				if cfg, err := config.Load(root); err == nil {
-					theme = cfg.Theme
-				}
-			}
-		}
-
-		// Fall back to env var.
-		if theme == "" {
-			theme = os.Getenv("WT_THEME")
-		}
-
-		// Only apply if a non-default theme was requested; the package
-		// vars in styles.go already hold the default values.
-		if theme != "" {
+		if theme := os.Getenv("WT_THEME"); theme != "" {
 			ui.ApplyTheme(theme)
 		}
 		return nil

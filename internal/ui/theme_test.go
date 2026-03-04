@@ -10,26 +10,26 @@ import (
 // defaultInfo and catppuccinInfo are derived from the registry so tests
 // stay in sync without duplicating hex literals.
 var (
-	defaultInfo    = lipgloss.Color(themes["default"].Info)
+	snazzyInfo     = lipgloss.Color(themes["snazzy"].Info)
 	catppuccinInfo = lipgloss.Color(themes["catppuccin-mocha"].Info)
 )
 
 func TestApplyTheme(t *testing.T) {
-	t.Cleanup(func() { ApplyTheme("default") })
+	t.Cleanup(func() { ApplyTheme("snazzy") })
 
 	ApplyTheme("catppuccin-mocha")
 
-	if ColorInfo == defaultInfo {
-		t.Error("expected ColorInfo to change from default after applying catppuccin-mocha")
+	if ColorInfo == snazzyInfo {
+		t.Error("expected ColorInfo to change from snazzy after applying catppuccin-mocha")
 	}
 	if ColorInfo != catppuccinInfo {
 		t.Errorf("expected ColorInfo = %v, got %v", catppuccinInfo, ColorInfo)
 	}
 
-	// Restore default and verify it reverts.
-	ApplyTheme("default")
-	if ColorInfo != defaultInfo {
-		t.Errorf("expected ColorInfo = %v after restoring default, got %v", defaultInfo, ColorInfo)
+	// Restore snazzy and verify it reverts.
+	ApplyTheme("snazzy")
+	if ColorInfo != snazzyInfo {
+		t.Errorf("expected ColorInfo = %v after restoring snazzy, got %v", snazzyInfo, ColorInfo)
 	}
 }
 
@@ -39,7 +39,7 @@ func TestApplyThemeUnknown(t *testing.T) {
 	Output = &buf
 	t.Cleanup(func() {
 		Output = origOutput
-		ApplyTheme("default")
+		ApplyTheme("snazzy")
 	})
 
 	ApplyTheme("bogus")
@@ -55,9 +55,9 @@ func TestApplyThemeUnknown(t *testing.T) {
 		t.Errorf("warning should list available themes, got: %s", out)
 	}
 
-	// Should fall back to default.
-	if ColorInfo != defaultInfo {
-		t.Errorf("expected fallback to default ColorInfo, got %v", ColorInfo)
+	// Should fall back to snazzy.
+	if ColorInfo != snazzyInfo {
+		t.Errorf("expected fallback to snazzy ColorInfo, got %v", ColorInfo)
 	}
 }
 
