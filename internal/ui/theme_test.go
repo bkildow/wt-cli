@@ -11,16 +11,16 @@ import (
 // stay in sync without duplicating hex literals.
 var (
 	defaultInfo    = lipgloss.Color(themes["default"].Info)
-	catppuccinInfo = lipgloss.Color(themes["catppuccin"].Info)
+	catppuccinInfo = lipgloss.Color(themes["catppuccin-mocha"].Info)
 )
 
 func TestApplyTheme(t *testing.T) {
 	t.Cleanup(func() { ApplyTheme("default") })
 
-	ApplyTheme("catppuccin")
+	ApplyTheme("catppuccin-mocha")
 
 	if ColorInfo == defaultInfo {
-		t.Error("expected ColorInfo to change from default after applying catppuccin")
+		t.Error("expected ColorInfo to change from default after applying catppuccin-mocha")
 	}
 	if ColorInfo != catppuccinInfo {
 		t.Errorf("expected ColorInfo = %v, got %v", catppuccinInfo, ColorInfo)
@@ -51,7 +51,7 @@ func TestApplyThemeUnknown(t *testing.T) {
 	if !bytes.Contains([]byte(out), []byte("bogus")) {
 		t.Errorf("warning should mention the unknown theme name, got: %s", out)
 	}
-	if !bytes.Contains([]byte(out), []byte("catppuccin")) {
+	if !bytes.Contains([]byte(out), []byte("catppuccin-mocha")) {
 		t.Errorf("warning should list available themes, got: %s", out)
 	}
 
@@ -63,8 +63,8 @@ func TestApplyThemeUnknown(t *testing.T) {
 
 func TestThemeNames(t *testing.T) {
 	names := ThemeNames()
-	if len(names) < 2 {
-		t.Fatalf("expected at least 2 themes, got %d", len(names))
+	if len(names) < 9 {
+		t.Fatalf("expected at least 9 themes, got %d", len(names))
 	}
 
 	// Verify sorted order.
@@ -80,7 +80,7 @@ func TestThemeNames(t *testing.T) {
 	for _, n := range names {
 		found[n] = true
 	}
-	for _, want := range []string{"default", "catppuccin"} {
+	for _, want := range []string{"default", "catppuccin-mocha", "snazzy", "dracula", "nord", "gruvbox"} {
 		if !found[want] {
 			t.Errorf("expected theme %q in list %v", want, names)
 		}
