@@ -10,9 +10,16 @@ git_dir: .git
 # Directory name for worktrees (relative to project root)
 worktree_dir: worktrees
 
+# Directory for shared files (copy/ and symlink/ subdirectories)
+shared_dir: shared
+
 # Editor for 'wt open' (e.g. cursor, code, zed)
 # Falls back to $EDITOR, then auto-detects
 # editor: cursor
+
+# Color theme for wt output (available: default, catppuccin)
+# Can also be set globally via WT_THEME env var
+# theme: catppuccin
 
 # Commands to run after creating a new worktree
 # setup:

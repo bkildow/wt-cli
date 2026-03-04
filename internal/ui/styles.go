@@ -2,12 +2,16 @@ package ui
 
 import "charm.land/lipgloss/v2"
 
+// defaultTheme is a package-level reference to avoid map lookups at init time.
+// These vars are reassigned at runtime by ApplyTheme().
+var dt = themes["default"]
+
 var (
-	ColorSuccess = lipgloss.Color("#22c55e")
-	ColorError   = lipgloss.Color("#ef4444")
-	ColorWarning = lipgloss.Color("#eab308")
-	ColorInfo    = lipgloss.Color("#3b82f6")
-	ColorMuted   = lipgloss.Color("#6b7280")
+	ColorSuccess = lipgloss.Color(dt.Success)
+	ColorError   = lipgloss.Color(dt.Error)
+	ColorWarning = lipgloss.Color(dt.Warning)
+	ColorInfo    = lipgloss.Color(dt.Info)
+	ColorMuted   = lipgloss.Color(dt.Muted)
 
 	StyleSuccess = lipgloss.NewStyle().Foreground(ColorSuccess)
 	StyleError   = lipgloss.NewStyle().Foreground(ColorError)
