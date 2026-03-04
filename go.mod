@@ -4,7 +4,7 @@ go 1.25.7
 
 require (
 	charm.land/lipgloss/v2 v2.0.0
-	github.com/charmbracelet/bubbles v0.21.1-0.20250623103423-23b8fd6302d7
+	github.com/charmbracelet/bubbles v1.0.0
 	github.com/charmbracelet/colorprofile v0.4.2
 	github.com/charmbracelet/huh v0.8.0
 	github.com/charmbracelet/lipgloss v1.1.0
@@ -18,7 +18,7 @@ require (
 	github.com/atotto/clipboard v0.1.4 // indirect
 	github.com/aymanbagabas/go-osc52/v2 v2.0.1 // indirect
 	github.com/catppuccin/go v0.3.0 // indirect
-	github.com/charmbracelet/bubbletea v1.3.6 // indirect
+	github.com/charmbracelet/bubbletea v1.3.10 // indirect
 	github.com/charmbracelet/ultraviolet v0.0.0-20251205161215-1948445e3318 // indirect
 	github.com/charmbracelet/x/ansi v0.11.6 // indirect
 	github.com/charmbracelet/x/cellbuf v0.0.15 // indirect
