@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/bkildow/wt-cli/internal/config"
 	"github.com/bkildow/wt-cli/internal/ui"
 )
 
@@ -17,8 +18,8 @@ type ApplyResult struct {
 	Symlinked int
 }
 
-func ApplyCopy(projectRoot, worktreePath string, dryRun bool, vars *TemplateVars) (int, error) {
-	copyDir := filepath.Join(projectRoot, "shared", "copy")
+func ApplyCopy(projectRoot, worktreePath string, cfg *config.Config, dryRun bool, vars *TemplateVars) (int, error) {
+	copyDir := filepath.Join(SharedPath(projectRoot, cfg), "copy")
 
 	if _, err := os.Stat(copyDir); os.IsNotExist(err) {
 		return 0, nil
@@ -95,8 +96,8 @@ func ApplyCopy(projectRoot, worktreePath string, dryRun bool, vars *TemplateVars
 
 // ApplySymlinks creates symlinks in the worktree for each top-level entry
 // in shared/symlink/.
-func ApplySymlinks(projectRoot, worktreePath string, dryRun bool) (int, error) {
-	symlinkDir := filepath.Join(projectRoot, "shared", "symlink")
+func ApplySymlinks(projectRoot, worktreePath string, cfg *config.Config, dryRun bool) (int, error) {
+	symlinkDir := filepath.Join(SharedPath(projectRoot, cfg), "symlink")
 
 	if _, err := os.Stat(symlinkDir); os.IsNotExist(err) {
 		return 0, nil
@@ -134,12 +135,12 @@ func ApplySymlinks(projectRoot, worktreePath string, dryRun bool) (int, error) {
 	return count, nil
 }
 
-func Apply(projectRoot, worktreePath string, dryRun bool, vars *TemplateVars) (ApplyResult, error) {
-	copied, err := ApplyCopy(projectRoot, worktreePath, dryRun, vars)
+func Apply(projectRoot, worktreePath string, cfg *config.Config, dryRun bool, vars *TemplateVars) (ApplyResult, error) {
+	copied, err := ApplyCopy(projectRoot, worktreePath, cfg, dryRun, vars)
 	if err != nil {
 		return ApplyResult{}, err
 	}
-	symlinked, err := ApplySymlinks(projectRoot, worktreePath, dryRun)
+	symlinked, err := ApplySymlinks(projectRoot, worktreePath, cfg, dryRun)
 	if err != nil {
 		return ApplyResult{}, err
 	}

@@ -11,10 +11,11 @@ stderr 'Initialized wt project'
 
 # Verify scaffold was created
 exists .worktree.yml
-exists shared/copy
-exists shared/symlink
-exists worktrees
+exists .worktrees/shared/copy
+exists .worktrees/shared/symlink
+exists .worktrees
 
 # Config should have correct values
 grep 'version: 1' .worktree.yml
-grep 'worktree_dir: worktrees' .worktree.yml
+grep 'worktree_dir: .worktrees' .worktree.yml
+grep 'shared_dir: .worktrees/shared' .worktree.yml

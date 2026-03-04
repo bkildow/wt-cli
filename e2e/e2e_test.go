@@ -125,7 +125,7 @@ func cmdSetupProject(ts *testscript.TestScript, neg bool, args []string) { //nol
 		}
 	}
 
-	cfg := "version: 1\ngit_dir: " + config.DefaultGitDir + "\nworktree_dir: " + config.DefaultWorktreeDir + "\n"
+	cfg := "version: 1\ngit_dir: " + config.DefaultGitDir + "\nworktree_dir: " + config.DefaultWorktreeDir + "\nshared_dir: " + config.DefaultSharedDir + "\n"
 	cfgPath := filepath.Join(projectDir, config.ConfigFileName)
 	if err := os.WriteFile(cfgPath, []byte(cfg), 0o644); err != nil {
 		ts.Fatalf("write config: %v", err)

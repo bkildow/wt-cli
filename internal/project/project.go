@@ -27,8 +27,8 @@ func FindRoot(startDir string) (string, error) {
 
 func CreateScaffold(projectRoot string, cfg *config.Config, dryRun bool) error {
 	dirs := []string{
-		filepath.Join(projectRoot, "shared", "copy"),
-		filepath.Join(projectRoot, "shared", "symlink"),
+		filepath.Join(SharedPath(projectRoot, cfg), "copy"),
+		filepath.Join(SharedPath(projectRoot, cfg), "symlink"),
 		WorktreesPath(projectRoot, cfg),
 	}
 
@@ -65,4 +65,8 @@ func GitDirPath(projectRoot string, cfg *config.Config) string {
 
 func WorktreesPath(projectRoot string, cfg *config.Config) string {
 	return filepath.Join(projectRoot, cfg.WorktreeDir)
+}
+
+func SharedPath(projectRoot string, cfg *config.Config) string {
+	return filepath.Join(projectRoot, cfg.SharedDir)
 }

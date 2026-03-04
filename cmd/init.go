@@ -15,7 +15,7 @@ func newInitCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "init",
 		Short: "Initialize wt in an existing git repository",
-		Long:  "Wraps an existing git repository for worktree management.\nCreates .worktree.yml, shared/ directories, and the worktrees directory.",
+		Long:  "Wraps an existing git repository for worktree management.\nCreates .worktree.yml and a .worktrees/ directory for shared files and worktrees.",
 		Args:  cobra.NoArgs,
 		RunE:  runInit,
 	}
@@ -46,6 +46,8 @@ func runInit(cmd *cobra.Command, args []string) error {
 
 	cfg := config.DefaultConfig()
 	cfg.GitDir = ".git"
+	cfg.WorktreeDir = ".worktrees"
+	cfg.SharedDir = ".worktrees/shared"
 
 	// Create scaffold directories
 	ui.Step("Creating project scaffold")
@@ -68,8 +70,8 @@ func runInit(cmd *cobra.Command, args []string) error {
 	ui.Info("  Use 'wt add <branch>' to create additional worktrees.")
 	ui.Info("")
 	ui.Info("  Consider adding to .gitignore:")
-	ui.Info("    worktrees/")
-	ui.Info("  Optionally ignore shared/ too (or commit it for team consistency).")
+	ui.Info("    .worktrees/")
+	ui.Info("  Or commit .worktrees/shared/ for team consistency and ignore only worktrees.")
 
 	return nil
 }

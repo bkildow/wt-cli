@@ -68,7 +68,7 @@ func TestFindRootNotFound(t *testing.T) {
 
 func TestCreateScaffold(t *testing.T) {
 	root := t.TempDir()
-	cfg := &config.Config{WorktreeDir: config.DefaultWorktreeDir}
+	cfg := &config.Config{WorktreeDir: config.DefaultWorktreeDir, SharedDir: config.DefaultSharedDir}
 
 	if err := CreateScaffold(root, cfg, false); err != nil {
 		t.Fatalf("CreateScaffold error: %v", err)
@@ -94,7 +94,7 @@ func TestCreateScaffold(t *testing.T) {
 
 func TestCreateScaffoldDryRun(t *testing.T) {
 	root := t.TempDir()
-	cfg := &config.Config{WorktreeDir: config.DefaultWorktreeDir}
+	cfg := &config.Config{WorktreeDir: config.DefaultWorktreeDir, SharedDir: config.DefaultSharedDir}
 
 	if err := CreateScaffold(root, cfg, true); err != nil {
 		t.Fatalf("CreateScaffold dry-run error: %v", err)
@@ -135,7 +135,7 @@ func TestWorktreesPath(t *testing.T) {
 
 func TestCreateScaffoldCustomDir(t *testing.T) {
 	root := t.TempDir()
-	cfg := &config.Config{WorktreeDir: "trees"}
+	cfg := &config.Config{WorktreeDir: "trees", SharedDir: config.DefaultSharedDir}
 
 	if err := CreateScaffold(root, cfg, false); err != nil {
 		t.Fatalf("CreateScaffold error: %v", err)

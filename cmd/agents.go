@@ -50,10 +50,10 @@ After wt init (existing repo):
     project/
       .git/               # Existing git directory (project root is the main worktree)
       .worktree.yml       # Project configuration
-      shared/
-        copy/
-        symlink/
-      worktrees/
+      .worktrees/
+        shared/
+          copy/           # Files copied into each new worktree
+          symlink/        # Directories symlinked into each new worktree
         feature-auth/     # Additional worktrees live here
 
 ## Command Reference

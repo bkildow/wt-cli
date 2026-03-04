@@ -15,6 +15,7 @@ const (
 	ConfigFileName     = ".worktree.yml"
 	DefaultGitDir      = ".bare"
 	DefaultWorktreeDir = "worktrees"
+	DefaultSharedDir   = "shared"
 )
 
 var (
@@ -26,6 +27,7 @@ type Config struct {
 	Version          int      `yaml:"version"`
 	GitDir           string   `yaml:"git_dir"`
 	WorktreeDir      string   `yaml:"worktree_dir"`
+	SharedDir        string   `yaml:"shared_dir"`
 	Setup            []string `yaml:"setup,omitempty"`
 	ParallelSetup    []string `yaml:"parallel_setup,omitempty"`
 	Teardown         []string `yaml:"teardown,omitempty"`
@@ -38,6 +40,7 @@ func DefaultConfig() Config {
 		Version:     1,
 		GitDir:      DefaultGitDir,
 		WorktreeDir: DefaultWorktreeDir,
+		SharedDir:   DefaultSharedDir,
 	}
 }
 
@@ -103,6 +106,13 @@ func renderAnnotatedConfig(cfg *Config) string {
 		fmt.Fprintf(&b, "worktree_dir: %s\n", cfg.WorktreeDir)
 	} else {
 		fmt.Fprintf(&b, "worktree_dir: %s\n", DefaultWorktreeDir)
+	}
+
+	b.WriteString("\n# Directory for shared files (copy/ and symlink/ subdirectories)\n")
+	if cfg != nil {
+		fmt.Fprintf(&b, "shared_dir: %s\n", cfg.SharedDir)
+	} else {
+		fmt.Fprintf(&b, "shared_dir: %s\n", DefaultSharedDir)
 	}
 
 	b.WriteString("\n# Editor for 'wt open' (e.g. cursor, code, zed)\n")
