@@ -60,6 +60,7 @@ func init() {
 	rootCmd.AddCommand(newSyncCmd())
 	rootCmd.AddCommand(newPruneCmd())
 	rootCmd.AddCommand(newRootCmd())
+	rootCmd.AddCommand(newRunSetupCmd())
 }
 
 func Execute() error {

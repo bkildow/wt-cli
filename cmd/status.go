@@ -41,7 +41,7 @@ func runStatus(cmd *cobra.Command, args []string) error {
 
 	ui.Heading("Worktree Status")
 
-	t := ui.NewTable().Headers("BRANCH", "PATH", "COMMIT", "STATUS", "AGE")
+	t := ui.NewTable().Headers("BRANCH", "PATH", "COMMIT", "STATUS", "SETUP", "LAST COMMIT")
 	for _, wt := range filtered {
 		relPath, err := filepath.Rel(projectRoot, wt.Path)
 		if err != nil {
@@ -68,8 +68,30 @@ func runStatus(cmd *cobra.Command, args []string) error {
 			styledStatus = ui.StyleWarning.Render("dirty")
 		}
 
-		t.Row(wt.Branch, relPath, shortHead, styledStatus, age)
+		styledSetup := renderSetupStatus(wt.Path)
+
+		t.Row(wt.Branch, relPath, shortHead, styledStatus, styledSetup, age)
 	}
 	ui.PrintTable(t)
 	return nil
+}
+
+func renderSetupStatus(worktreePath string) string {
+	state, err := project.ResolveSetupStatus(worktreePath)
+	if err != nil || state == nil {
+		return ui.StyleMuted.Render("-")
+	}
+
+	switch state.Status {
+	case project.SetupRunning:
+		return ui.StyleInfo.Render("In Progress")
+	case project.SetupComplete:
+		return ui.StyleSuccess.Render("Complete")
+	case project.SetupSkipped:
+		return ui.StyleWarning.Render("Skipped")
+	case project.SetupFailed:
+		return ui.StyleError.Render("Failed")
+	default:
+		return ui.StyleMuted.Render("-")
+	}
 }

@@ -79,6 +79,12 @@ func runClone(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	// Configure local git excludes for wt-managed files
+	ui.Step("Configuring local git excludes")
+	if err := project.EnsureGitExclude(bareDir, dry); err != nil {
+		return err
+	}
+
 	// Save annotated config
 	ui.Step("Writing " + config.ConfigFileName)
 	if dry {

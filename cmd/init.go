@@ -55,6 +55,13 @@ func runInit(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	// Configure local git excludes for wt-managed files
+	gitDir := filepath.Join(projectRoot, cfg.GitDir)
+	ui.Step("Configuring local git excludes")
+	if err := project.EnsureGitExclude(gitDir, dry); err != nil {
+		return err
+	}
+
 	// Write annotated config
 	ui.Step("Writing " + config.ConfigFileName)
 	if dry {
