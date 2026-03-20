@@ -6,9 +6,11 @@ import (
 	"os"
 	"time"
 
+	lipgloss "charm.land/lipgloss/v2"
 	"github.com/bkildow/wt-cli/internal/config"
 	"github.com/bkildow/wt-cli/internal/project"
 	"github.com/bkildow/wt-cli/internal/ui"
+	"github.com/charmbracelet/colorprofile"
 
 	"github.com/spf13/cobra"
 )
@@ -45,8 +47,11 @@ func runRunSetup(cmd *cobra.Command, args []string) error {
 	}
 	defer func() { _ = logFile.Close() }()
 
-	// Redirect all UI output to the log file.
-	ui.Output = logFile
+	// Wrap the log file so ANSI escape codes from subprocesses (e.g.
+	// composer, npm) are stripped before being written to disk.
+	cpw := colorprofile.NewWriter(logFile, os.Environ())
+	ui.Output = cpw
+	lipgloss.Writer = cpw
 
 	hooksTotal := len(cfg.Setup) + len(cfg.ParallelSetup)
 
