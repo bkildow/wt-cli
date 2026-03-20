@@ -9,6 +9,7 @@ A CLI for managing git worktree-based development workflows. Clone once as a bar
 - **Template variables** — `${PROJECT_ROOT}`, `${WORKTREE_ID}`, `${BRANCH_NAME}`, etc. substituted in `.template` files
 - **Interactive by default** — branch/worktree pickers when arguments are omitted
 - **Setup/teardown hooks** — run commands automatically when creating or removing worktrees
+- **Claude Code integration** — automatic worktree creation/removal via Claude Code hooks
 - **Editor integration** — open worktrees in your preferred editor ($EDITOR, config, or auto-detect)
 - **Shell completions** — tab-complete worktree names in bash, zsh, and fish
 - **Dry-run support** — preview every destructive operation with `--dry-run`
@@ -69,6 +70,7 @@ wt prune
 | `wt sync` | Fetch and pull all worktrees |
 | `wt prune` | Remove worktrees with fully merged branches |
 | `wt config init` | Generate annotated `.worktree.yml` with documentation |
+| `wt claude init` | Configure Claude Code hooks for automatic worktree management |
 | `wt agents` | Print AI agent workflow instructions |
 | `wt shell-init <shell>` | Print shell startup config (wrapper + completions) |
 | `wt completion <shell>` | Generate shell completion script |
@@ -182,6 +184,21 @@ wt agents > AGENTS.md        # Save as a file in your project
 
 Outputs structured workflow instructions for AI coding assistants to understand how to use `wt` in non-interactive mode.
 
+### wt claude init
+
+```bash
+wt claude init               # Configure Claude Code hooks
+wt claude init --binary /path/to/wt  # Use a specific wt binary path
+```
+
+Sets up [Claude Code hooks](https://docs.anthropic.com/en/docs/claude-code/hooks) so that Claude Code agents can create and remove worktrees automatically. Writes hook configuration to `shared/symlink/.claude/settings.local.json` and applies it to all existing worktrees via symlink.
+
+This enables two hooks:
+- **WorktreeCreate** — when Claude Code spawns a subagent with `--worktree`, `wt` creates the worktree, applies shared files, and runs setup hooks
+- **WorktreeRemove** — when the subagent finishes, `wt` runs teardown hooks and cleans up the worktree and branch
+
+Run `wt claude init` once per project. The hooks propagate to all worktrees automatically.
+
 ### wt completion
 
 ```bash
@@ -202,6 +219,7 @@ project/
 │   ├── copy/                # Files copied into each worktree
 │   │   └── .env.example     # Supports ${TEMPLATE_VARS}
 │   └── symlink/             # Shared resources symlinked from worktrees
+│       ├── .claude/         # Claude Code hooks (via wt claude init)
 │       ├── node_modules/
 │       └── vendor/
 └── worktrees/
