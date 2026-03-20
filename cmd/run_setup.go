@@ -9,6 +9,7 @@ import (
 	"github.com/bkildow/wt-cli/internal/config"
 	"github.com/bkildow/wt-cli/internal/project"
 	"github.com/bkildow/wt-cli/internal/ui"
+
 	"github.com/spf13/cobra"
 )
 
@@ -82,6 +83,13 @@ func runRunSetup(cmd *cobra.Command, args []string) error {
 		state.Status = project.SetupComplete
 	}
 	state.CompletedAt = time.Now()
+
+	elapsed := ui.FormatDuration(state.CompletedAt.Sub(state.StartedAt))
+	if setupErr != nil {
+		ui.Warning("Worktree setup failed after " + elapsed)
+	} else {
+		ui.Success("Worktree setup completed in " + elapsed)
+	}
 
 	return project.WriteSetupState(worktreePath, state)
 }

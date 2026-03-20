@@ -191,10 +191,11 @@ func runSetupForeground(cmd *cobra.Command, worktreePath string, cfg *config.Con
 		}
 	}
 
+	elapsed := ui.FormatDuration(time.Since(startedAt))
 	if setupErr != nil {
-		ui.Warning(msg + " — setup hooks failed")
+		ui.Warning(msg + " — setup hooks failed after " + elapsed)
 	} else {
-		ui.Success(msg)
+		ui.Success(msg + " — completed in " + elapsed)
 	}
 	fmt.Println(worktreePath)
 	return nil
