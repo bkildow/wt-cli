@@ -201,6 +201,55 @@ func TestApplyCopyWithTemplateVars(t *testing.T) {
 	}
 }
 
+func TestApplySymlinksDirectoryConflict(t *testing.T) {
+	root := t.TempDir()
+	wt := t.TempDir()
+
+	// Source: shared/symlink/.claude/settings.local.json
+	symlinkDir := filepath.Join(root, "shared", "symlink", ".claude")
+	if err := os.MkdirAll(symlinkDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	settingsSrc := filepath.Join(symlinkDir, "settings.local.json")
+	if err := os.WriteFile(settingsSrc, []byte(`{"hooks":{}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Destination: worktree/.claude/ already exists with its own file
+	claudeDir := filepath.Join(wt, ".claude")
+	if err := os.MkdirAll(claudeDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	existingFile := filepath.Join(claudeDir, "CLAUDE.md")
+	if err := os.WriteFile(existingFile, []byte("# existing"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := &config.Config{SharedDir: config.DefaultSharedDir}
+	count, err := ApplySymlinks(root, wt, cfg, false)
+	if err != nil {
+		t.Fatalf("ApplySymlinks error: %v", err)
+	}
+	if count != 1 {
+		t.Errorf("symlink count = %d, want 1", count)
+	}
+
+	// settings.local.json should be a symlink to the shared source.
+	link := filepath.Join(claudeDir, "settings.local.json")
+	target, err := os.Readlink(link)
+	if err != nil {
+		t.Fatalf("symlink not created: %v", err)
+	}
+	if target != settingsSrc {
+		t.Errorf("symlink target = %q, want %q", target, settingsSrc)
+	}
+
+	// Pre-existing file should be untouched.
+	if _, err := os.Stat(existingFile); err != nil {
+		t.Errorf("existing file was removed: %v", err)
+	}
+}
+
 func TestApplyCopyNonTemplateFilesCopiedAsIs(t *testing.T) {
 	root := t.TempDir()
 	wt := t.TempDir()

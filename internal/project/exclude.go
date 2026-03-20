@@ -70,11 +70,11 @@ func EnsureGitExclude(gitDir string, dryRun bool) error {
 		buf.WriteByte('\n')
 	}
 
-	f, err := os.OpenFile(excludePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
+	f, err := os.OpenFile(excludePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	_, err = f.WriteString(buf.String())
 	return err

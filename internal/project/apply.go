@@ -95,7 +95,9 @@ func ApplyCopy(projectRoot, worktreePath string, cfg *config.Config, dryRun bool
 }
 
 // ApplySymlinks creates symlinks in the worktree for each top-level entry
-// in shared/symlink/.
+// in shared/symlink/. When a destination already exists as a real directory
+// (e.g. .claude/ created by Claude Code), the contents are symlinked
+// individually instead of replacing the directory.
 func ApplySymlinks(projectRoot, worktreePath string, cfg *config.Config, dryRun bool) (int, error) {
 	symlinkDir := filepath.Join(SharedPath(projectRoot, cfg), "symlink")
 
@@ -120,6 +122,21 @@ func ApplySymlinks(projectRoot, worktreePath string, cfg *config.Config, dryRun 
 			continue
 		}
 
+		// If source is a directory and destination is a real directory (not a
+		// symlink), symlink individual files inside instead of replacing the
+		// whole directory. This preserves worktree-local files like those in
+		// .claude/ while still symlinking shared config files.
+		if entry.IsDir() {
+			if info, err := os.Lstat(link); err == nil && info.IsDir() && info.Mode()&os.ModeSymlink == 0 {
+				n, err := symlinkDirContents(target, link, worktreePath)
+				count += n
+				if err != nil {
+					return count, err
+				}
+				continue
+			}
+		}
+
 		// Remove existing file/symlink at destination (error ignored; Symlink will fail if needed)
 		_ = os.Remove(link)
 
@@ -129,6 +146,50 @@ func ApplySymlinks(projectRoot, worktreePath string, cfg *config.Config, dryRun 
 
 		relTarget, _ := filepath.Rel(worktreePath, target)
 		ui.Info(fmt.Sprintf("  symlinked %s → %s", entry.Name(), relTarget))
+		count++
+	}
+
+	return count, nil
+}
+
+// symlinkDirContents symlinks individual entries from srcDir into destDir,
+// recursing into subdirectories that already exist at the destination.
+func symlinkDirContents(srcDir, destDir, worktreePath string) (int, error) {
+	if err := os.MkdirAll(destDir, 0o755); err != nil {
+		return 0, err
+	}
+
+	entries, err := os.ReadDir(srcDir)
+	if err != nil {
+		return 0, err
+	}
+
+	var count int
+	for _, entry := range entries {
+		src := filepath.Join(srcDir, entry.Name())
+		dest := filepath.Join(destDir, entry.Name())
+
+		// Recurse if both source and destination are real directories.
+		if entry.IsDir() {
+			if info, err := os.Lstat(dest); err == nil && info.IsDir() && info.Mode()&os.ModeSymlink == 0 {
+				n, err := symlinkDirContents(src, dest, worktreePath)
+				count += n
+				if err != nil {
+					return count, err
+				}
+				continue
+			}
+		}
+
+		_ = os.Remove(dest)
+
+		if err := os.Symlink(src, dest); err != nil {
+			return count, err
+		}
+
+		relName, _ := filepath.Rel(worktreePath, dest)
+		relTarget, _ := filepath.Rel(worktreePath, src)
+		ui.Info(fmt.Sprintf("  symlinked %s → %s", relName, relTarget))
 		count++
 	}
 

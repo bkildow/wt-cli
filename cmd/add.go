@@ -221,8 +221,18 @@ func runSetupBackground(projectRoot, worktreePath string, cfg *config.Config, dr
 		"--project-root", projectRoot,
 	)
 	child.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
-	child.Stdout = nil
-	child.Stderr = nil
+
+	// Redirect child's stdio to /dev/null so it doesn't inherit the parent's
+	// pipe file descriptors. Without this, Claude Code hooks hang because the
+	// child keeps the parent's stdout fd open, preventing EOF.
+	devNull, err := os.OpenFile(os.DevNull, os.O_RDWR, 0)
+	if err != nil {
+		return fmt.Errorf("failed to open %s: %w", os.DevNull, err)
+	}
+	defer func() { _ = devNull.Close() }()
+	child.Stdin = devNull
+	child.Stdout = devNull
+	child.Stderr = devNull
 
 	if err := child.Start(); err != nil {
 		return fmt.Errorf("failed to start background setup: %w", err)
