@@ -1,0 +1,278 @@
+package cmd
+
+import (
+	"encoding/json"
+	"fmt"
+	"io"
+	"os"
+	"path/filepath"
+
+	"github.com/bkildow/wt-cli/internal/claude"
+	"github.com/bkildow/wt-cli/internal/config"
+	"github.com/bkildow/wt-cli/internal/git"
+	"github.com/bkildow/wt-cli/internal/project"
+	"github.com/bkildow/wt-cli/internal/ui"
+	"github.com/spf13/cobra"
+)
+
+// hookPayload is the JSON structure Claude Code sends on stdin for hook events.
+type hookPayload struct {
+	SessionID     string `json:"session_id"`
+	Cwd           string `json:"cwd"`
+	HookEventName string `json:"hook_event_name"`
+	WorktreeName  string `json:"worktree_name"`
+	ProjectDir    string `json:"project_dir"`
+	WorktreePath  string `json:"worktree_path"`
+}
+
+func newClaudeCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "claude",
+		Short: "Claude Code integration",
+		Long:  "Commands for integrating wt with Claude Code hooks.",
+	}
+
+	cmd.AddCommand(newClaudeInitCmd())
+	cmd.AddCommand(newClaudeHookWorktreeCreateCmd())
+	cmd.AddCommand(newClaudeHookWorktreeRemoveCmd())
+
+	return cmd
+}
+
+func newClaudeInitCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "init",
+		Short: "Configure Claude Code hooks for this project",
+		Long:  "Writes WorktreeCreate and WorktreeRemove hooks to .claude/settings.local.json so that Claude Code agents create worktrees through wt.",
+		Args:  cobra.NoArgs,
+		RunE:  runClaudeInit,
+	}
+	cmd.Flags().String("binary", "wt", "Path or name of the wt binary to use in hook commands")
+	return cmd
+}
+
+func newClaudeHookWorktreeCreateCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:    "hook-worktree-create",
+		Short:  "Handle Claude Code WorktreeCreate hook",
+		Hidden: true,
+		Args:   cobra.NoArgs,
+		RunE:   runClaudeHookWorktreeCreate,
+	}
+}
+
+func newClaudeHookWorktreeRemoveCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:    "hook-worktree-remove",
+		Short:  "Handle Claude Code WorktreeRemove hook",
+		Hidden: true,
+		Args:   cobra.NoArgs,
+		RunE:   runClaudeHookWorktreeRemove,
+	}
+}
+
+func runClaudeInit(cmd *cobra.Command, _ []string) error {
+	projectRoot, _, err := loadProject()
+	if err != nil {
+		return err
+	}
+
+	wtBinary, _ := cmd.Flags().GetString("binary")
+
+	if claude.IsHooksConfigured(projectRoot) {
+		ui.Info("Claude Code hooks are already configured, updating...")
+	}
+
+	if err := claude.ConfigureHooks(projectRoot, wtBinary); err != nil {
+		return fmt.Errorf("failed to configure hooks: %w", err)
+	}
+
+	ui.Success("Configured Claude Code hooks in .claude/settings.local.json")
+	ui.Info("  WorktreeCreate -> " + wtBinary + " claude hook-worktree-create")
+	ui.Info("  WorktreeRemove -> " + wtBinary + " claude hook-worktree-remove")
+	return nil
+}
+
+func runClaudeHookWorktreeCreate(cmd *cobra.Command, _ []string) error {
+	ctx := cmd.Context()
+
+	hctx, err := loadHookContext()
+	if err != nil {
+		return err
+	}
+
+	projectRoot, cfg := hctx.projectRoot, hctx.cfg
+	gitDir := project.GitDirPath(projectRoot, cfg)
+	runner := git.NewRunner(gitDir, false)
+
+	// Ensure git excludes are configured.
+	if err := project.EnsureGitExclude(gitDir, false); err != nil {
+		ui.Warning("Could not configure git excludes: " + err.Error())
+	}
+
+	ui.Step("Fetching all remotes")
+	if err := runner.FetchAll(ctx); err != nil {
+		return fmt.Errorf("fetch failed: %w", err)
+	}
+
+	branch := hctx.payload.WorktreeName
+	worktreePath := filepath.Join(project.WorktreesPath(projectRoot, cfg), branch)
+
+	// If the worktree already exists, just return its path.
+	if _, err := os.Stat(worktreePath); err == nil {
+		fmt.Println(worktreePath)
+		return nil
+	}
+
+	hasRemote, err := runner.HasRemoteBranch(ctx, branch)
+	if err != nil {
+		return fmt.Errorf("branch check failed: %w", err)
+	}
+
+	ui.Step("Adding worktree for branch: " + branch)
+	if hasRemote {
+		if err := runner.WorktreeAdd(ctx, worktreePath, branch); err != nil {
+			return fmt.Errorf("worktree add failed: %w", err)
+		}
+	} else {
+		if err := runner.WorktreeAddNew(ctx, worktreePath, branch); err != nil {
+			return fmt.Errorf("worktree add (new branch) failed: %w", err)
+		}
+	}
+
+	vars := project.NewTemplateVars(projectRoot, worktreePath, branch)
+	result, err := project.Apply(projectRoot, worktreePath, cfg, false, &vars)
+	if err != nil {
+		return fmt.Errorf("apply shared files failed: %w", err)
+	}
+
+	msg := fmt.Sprintf("Worktree created: %s/%s (%d copied, %d symlinked)",
+		cfg.WorktreeDir, branch, result.Copied, result.Symlinked)
+
+	// Launch setup hooks in background if configured.
+	// runSetupBackground prints the worktree path to stdout on its own.
+	hasHooks := len(cfg.Setup) > 0 || len(cfg.ParallelSetup) > 0
+	if hasHooks {
+		if err := runSetupBackground(projectRoot, worktreePath, cfg, false, msg); err != nil {
+			// Setup hook failure is non-fatal — the worktree is still usable.
+			ui.Warning("Background setup failed to start: " + err.Error())
+			fmt.Println(worktreePath)
+		}
+		return nil
+	}
+
+	// No hooks — print path directly.
+	ui.Success(msg)
+	fmt.Println(worktreePath)
+	return nil
+}
+
+func runClaudeHookWorktreeRemove(cmd *cobra.Command, _ []string) error {
+	ctx := cmd.Context()
+
+	hctx, err := loadHookContext()
+	if err != nil {
+		return err
+	}
+
+	projectRoot, cfg := hctx.projectRoot, hctx.cfg
+	branch := hctx.payload.WorktreeName
+	worktreePath := hctx.payload.WorktreePath
+	if worktreePath == "" {
+		worktreePath = filepath.Join(project.WorktreesPath(projectRoot, cfg), branch)
+	}
+
+	// Terminate any in-progress background setup.
+	terminateBackgroundSetup(worktreePath, branch)
+
+	// Run teardown hooks.
+	if err := project.RunTeardownHooks(ctx, cfg, worktreePath, false); err != nil {
+		ui.Warning("Teardown hooks failed: " + err.Error())
+	}
+	if err := project.RunParallelTeardownHooks(ctx, cfg, worktreePath, false); err != nil {
+		ui.Warning("Parallel teardown hooks failed: " + err.Error())
+	}
+
+	gitDir := project.GitDirPath(projectRoot, cfg)
+	runner := git.NewRunner(gitDir, false)
+
+	// Force remove — Claude agents may have uncommitted changes.
+	ui.Step("Removing worktree: " + branch)
+	if err := runner.WorktreeRemove(ctx, worktreePath, true); err != nil {
+		ui.Warning("Worktree remove failed: " + err.Error())
+	}
+
+	if err := runner.BranchDelete(ctx, branch, false); err != nil {
+		ui.Warning("Could not delete branch: " + err.Error())
+	}
+
+	ui.Success("Removed worktree: " + branch)
+	return nil
+}
+
+// hookContext bundles common state resolved during hook initialization.
+type hookContext struct {
+	payload     hookPayload
+	projectRoot string
+	cfg         *config.Config
+}
+
+// loadHookContext reads the JSON payload from stdin, validates it, resolves the
+// project root, and loads the config. Both hook handlers share this setup.
+func loadHookContext() (*hookContext, error) {
+	payload, err := readHookPayload(os.Stdin)
+	if err != nil {
+		return nil, err
+	}
+	if payload.WorktreeName == "" {
+		return nil, fmt.Errorf("worktree_name is required in hook payload")
+	}
+	projectRoot, err := resolveProjectRoot(payload)
+	if err != nil {
+		return nil, err
+	}
+	cfg, err := config.Load(projectRoot)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load config: %w", err)
+	}
+	return &hookContext{payload: payload, projectRoot: projectRoot, cfg: cfg}, nil
+}
+
+// readHookPayload parses the JSON hook payload from the given reader.
+func readHookPayload(r io.Reader) (hookPayload, error) {
+	data, err := io.ReadAll(r)
+	if err != nil {
+		return hookPayload{}, fmt.Errorf("failed to read stdin: %w", err)
+	}
+
+	if len(data) == 0 {
+		return hookPayload{}, fmt.Errorf("no payload received on stdin")
+	}
+
+	var payload hookPayload
+	if err := json.Unmarshal(data, &payload); err != nil {
+		return hookPayload{}, fmt.Errorf("invalid JSON payload: %w", err)
+	}
+
+	return payload, nil
+}
+
+// resolveProjectRoot determines the project root from the hook payload.
+// It tries project_dir first, then cwd.
+func resolveProjectRoot(payload hookPayload) (string, error) {
+	if payload.ProjectDir != "" {
+		root, err := project.FindRoot(payload.ProjectDir)
+		if err == nil {
+			return root, nil
+		}
+	}
+
+	if payload.Cwd != "" {
+		root, err := project.FindRoot(payload.Cwd)
+		if err == nil {
+			return root, nil
+		}
+	}
+
+	return "", fmt.Errorf("could not find wt project root from payload (project_dir=%q, cwd=%q)", payload.ProjectDir, payload.Cwd)
+}
