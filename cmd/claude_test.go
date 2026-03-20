@@ -1,12 +1,13 @@
 package cmd
 
 import (
+	"io"
 	"strings"
 	"testing"
 )
 
 func TestReadHookPayload_valid(t *testing.T) {
-	input := `{"session_id":"abc","worktree_name":"feature/test","project_dir":"/tmp/proj","cwd":"/tmp/proj"}`
+	input := `{"session_id":"abc","hook_event_name":"WorktreeCreate","name":"feature/test","cwd":"/tmp/proj"}`
 	payload, err := readHookPayload(strings.NewReader(input))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -14,11 +15,11 @@ func TestReadHookPayload_valid(t *testing.T) {
 	if payload.SessionID != "abc" {
 		t.Errorf("session_id = %q, want %q", payload.SessionID, "abc")
 	}
-	if payload.WorktreeName != "feature/test" {
-		t.Errorf("worktree_name = %q, want %q", payload.WorktreeName, "feature/test")
+	if payload.Name != "feature/test" {
+		t.Errorf("name = %q, want %q", payload.Name, "feature/test")
 	}
-	if payload.ProjectDir != "/tmp/proj" {
-		t.Errorf("project_dir = %q, want %q", payload.ProjectDir, "/tmp/proj")
+	if payload.Cwd != "/tmp/proj" {
+		t.Errorf("cwd = %q, want %q", payload.Cwd, "/tmp/proj")
 	}
 }
 
@@ -49,27 +50,45 @@ func TestReadHookPayload_missingFields(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if payload.WorktreeName != "" {
-		t.Errorf("worktree_name should be empty, got %q", payload.WorktreeName)
+	if payload.Name != "" {
+		t.Errorf("name should be empty, got %q", payload.Name)
 	}
 }
 
 func TestReadHookPayload_extraFields(t *testing.T) {
 	// Extra fields should be silently ignored.
-	input := `{"worktree_name":"test","unknown_field":"value"}`
+	input := `{"name":"test","unknown_field":"value"}`
 	payload, err := readHookPayload(strings.NewReader(input))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if payload.WorktreeName != "test" {
-		t.Errorf("worktree_name = %q, want %q", payload.WorktreeName, "test")
+	if payload.Name != "test" {
+		t.Errorf("name = %q, want %q", payload.Name, "test")
 	}
+}
+
+func TestReadHookPayload_noEOF(t *testing.T) {
+	// Simulate a pipe that delivers JSON but never closes (no EOF).
+	// json.NewDecoder should return after parsing the complete object.
+	pr, pw := io.Pipe()
+	go func() {
+		_, _ = pw.Write([]byte(`{"session_id":"abc","name":"test"}`))
+		// Deliberately do NOT close pw — simulates a pipe that stays open.
+	}()
+
+	payload, err := readHookPayload(pr)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if payload.Name != "test" {
+		t.Errorf("name = %q, want %q", payload.Name, "test")
+	}
+	_ = pw.Close()
 }
 
 func TestResolveProjectRoot_noProject(t *testing.T) {
 	payload := hookPayload{
-		ProjectDir: "/nonexistent/path",
-		Cwd:        "/also/nonexistent",
+		Cwd: "/nonexistent/path",
 	}
 	_, err := resolveProjectRoot(payload)
 	if err == nil {

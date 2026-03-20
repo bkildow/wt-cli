@@ -16,13 +16,14 @@ import (
 )
 
 // hookPayload is the JSON structure Claude Code sends on stdin for hook events.
+// See https://code.claude.com/docs/en/hooks for the payload schema.
 type hookPayload struct {
-	SessionID     string `json:"session_id"`
-	Cwd           string `json:"cwd"`
-	HookEventName string `json:"hook_event_name"`
-	WorktreeName  string `json:"worktree_name"`
-	ProjectDir    string `json:"project_dir"`
-	WorktreePath  string `json:"worktree_path"`
+	SessionID      string `json:"session_id"`
+	TranscriptPath string `json:"transcript_path"`
+	Cwd            string `json:"cwd"`
+	HookEventName  string `json:"hook_event_name"`
+	Name           string `json:"name"`          // WorktreeCreate: worktree slug
+	WorktreePath   string `json:"worktree_path"` // WorktreeRemove: absolute path
 }
 
 func newClaudeCmd() *cobra.Command {
@@ -115,7 +116,7 @@ func runClaudeHookWorktreeCreate(cmd *cobra.Command, _ []string) error {
 		return fmt.Errorf("fetch failed: %w", err)
 	}
 
-	branch := hctx.payload.WorktreeName
+	branch := hctx.payload.Name
 	worktreePath := filepath.Join(project.WorktreesPath(projectRoot, cfg), branch)
 
 	// If the worktree already exists, just return its path.
@@ -176,10 +177,13 @@ func runClaudeHookWorktreeRemove(cmd *cobra.Command, _ []string) error {
 	}
 
 	projectRoot, cfg := hctx.projectRoot, hctx.cfg
-	branch := hctx.payload.WorktreeName
 	worktreePath := hctx.payload.WorktreePath
-	if worktreePath == "" {
-		worktreePath = filepath.Join(project.WorktreesPath(projectRoot, cfg), branch)
+
+	// Derive branch name from the worktree path (everything after the worktrees dir).
+	worktreesDir := project.WorktreesPath(projectRoot, cfg)
+	branch, err := filepath.Rel(worktreesDir, worktreePath)
+	if err != nil {
+		return fmt.Errorf("cannot determine branch from worktree path: %w", err)
 	}
 
 	// Terminate any in-progress background setup.
@@ -224,9 +228,19 @@ func loadHookContext() (*hookContext, error) {
 	if err != nil {
 		return nil, err
 	}
-	if payload.WorktreeName == "" {
-		return nil, fmt.Errorf("worktree_name is required in hook payload")
+
+	// Validate required fields based on event type.
+	switch payload.HookEventName {
+	case "WorktreeCreate":
+		if payload.Name == "" {
+			return nil, fmt.Errorf("name is required in WorktreeCreate payload")
+		}
+	case "WorktreeRemove":
+		if payload.WorktreePath == "" {
+			return nil, fmt.Errorf("worktree_path is required in WorktreeRemove payload")
+		}
 	}
+
 	projectRoot, err := resolveProjectRoot(payload)
 	if err != nil {
 		return nil, err
@@ -239,34 +253,21 @@ func loadHookContext() (*hookContext, error) {
 }
 
 // readHookPayload parses the JSON hook payload from the given reader.
+// Uses json.NewDecoder so it returns as soon as one JSON object is read,
+// without waiting for EOF (which may never arrive from Claude Code's pipe).
 func readHookPayload(r io.Reader) (hookPayload, error) {
-	data, err := io.ReadAll(r)
-	if err != nil {
-		return hookPayload{}, fmt.Errorf("failed to read stdin: %w", err)
-	}
-
-	if len(data) == 0 {
-		return hookPayload{}, fmt.Errorf("no payload received on stdin")
-	}
-
 	var payload hookPayload
-	if err := json.Unmarshal(data, &payload); err != nil {
+	if err := json.NewDecoder(r).Decode(&payload); err != nil {
+		if err == io.EOF {
+			return hookPayload{}, fmt.Errorf("no payload received on stdin")
+		}
 		return hookPayload{}, fmt.Errorf("invalid JSON payload: %w", err)
 	}
-
 	return payload, nil
 }
 
 // resolveProjectRoot determines the project root from the hook payload.
-// It tries project_dir first, then cwd.
 func resolveProjectRoot(payload hookPayload) (string, error) {
-	if payload.ProjectDir != "" {
-		root, err := project.FindRoot(payload.ProjectDir)
-		if err == nil {
-			return root, nil
-		}
-	}
-
 	if payload.Cwd != "" {
 		root, err := project.FindRoot(payload.Cwd)
 		if err == nil {
@@ -274,5 +275,5 @@ func resolveProjectRoot(payload hookPayload) (string, error) {
 		}
 	}
 
-	return "", fmt.Errorf("could not find wt project root from payload (project_dir=%q, cwd=%q)", payload.ProjectDir, payload.Cwd)
+	return "", fmt.Errorf("could not find wt project root from payload (cwd=%q)", payload.Cwd)
 }
