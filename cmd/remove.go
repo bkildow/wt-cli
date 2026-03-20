@@ -2,6 +2,8 @@ package cmd
 
 import (
 	"fmt"
+	"syscall"
+	"time"
 
 	"github.com/bkildow/wt-cli/internal/git"
 	"github.com/bkildow/wt-cli/internal/project"
@@ -89,6 +91,9 @@ func runRemove(cmd *cobra.Command, args []string) error {
 		}
 	}
 
+	// Terminate any in-progress background setup before teardown.
+	terminateBackgroundSetup(selected.Path, selected.Branch)
+
 	skipTeardown, _ := cmd.Flags().GetBool("skip-teardown")
 	if !skipTeardown {
 		if err := project.RunTeardownHooks(ctx, cfg, selected.Path, IsDryRun()); err != nil {
@@ -110,4 +115,36 @@ func runRemove(cmd *cobra.Command, args []string) error {
 
 	ui.Success("Removed worktree: " + selected.Branch)
 	return nil
+}
+
+// terminateBackgroundSetup kills an in-progress background setup process.
+func terminateBackgroundSetup(worktreePath, branch string) {
+	state, err := project.ReadSetupState(worktreePath)
+	if err != nil || state == nil {
+		return
+	}
+	if state.Status != project.SetupRunning || !project.IsProcessAlive(state.PID) {
+		return
+	}
+
+	ui.Warning(fmt.Sprintf("Terminating in-progress setup for %s (PID %d)", branch, state.PID))
+	_ = syscall.Kill(state.PID, syscall.SIGTERM)
+
+	// Poll for exit, then force-kill if the process doesn't terminate.
+	deadline := time.After(2 * time.Second)
+	tick := time.NewTicker(100 * time.Millisecond)
+	defer tick.Stop()
+	for {
+		select {
+		case <-tick.C:
+			if !project.IsProcessAlive(state.PID) {
+				return
+			}
+		case <-deadline:
+			if project.IsProcessAlive(state.PID) {
+				_ = syscall.Kill(state.PID, syscall.SIGKILL)
+			}
+			return
+		}
+	}
 }

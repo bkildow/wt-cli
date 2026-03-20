@@ -44,19 +44,27 @@ func (pw *prefixWriter) flush() {
 	}
 }
 
+// HookProgressFunc is called after each serial hook completes.
+// index is the 0-based position, cmdStr is the command, err is nil on success.
+type HookProgressFunc func(index int, cmdStr string, err error)
+
 // RunSetupHooks executes each command in cfg.Setup inside the
 // worktree directory. Failures are logged but do not stop subsequent hooks.
-func RunSetupHooks(ctx context.Context, cfg *config.Config, worktreePath string, dryRun bool) error {
+// An optional onProgress callback is called after each hook completes.
+func RunSetupHooks(ctx context.Context, cfg *config.Config, worktreePath string, dryRun bool, onProgress HookProgressFunc) error {
 	if len(cfg.Setup) == 0 {
 		return nil
 	}
 
 	failCount := 0
-	for _, cmdStr := range cfg.Setup {
+	for i, cmdStr := range cfg.Setup {
 		ui.Step("Running: " + cmdStr)
 
 		if dryRun {
 			ui.DryRunNotice("exec: " + cmdStr)
+			if onProgress != nil {
+				onProgress(i, cmdStr, nil)
+			}
 			continue
 		}
 
@@ -65,12 +73,18 @@ func RunSetupHooks(ctx context.Context, cfg *config.Config, worktreePath string,
 		cmd.Stdout = ui.Output
 		cmd.Stderr = ui.Output
 
+		var hookErr error
 		if err := cmd.Run(); err != nil {
 			ui.Error("Failed: " + cmdStr + ": " + err.Error())
+			hookErr = err
 			failCount++
-			continue
+		} else {
+			ui.Success("Completed: " + cmdStr)
 		}
-		ui.Success("Completed: " + cmdStr)
+
+		if onProgress != nil {
+			onProgress(i, cmdStr, hookErr)
+		}
 	}
 
 	if failCount > 0 {

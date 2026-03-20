@@ -4,8 +4,12 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"syscall"
+	"time"
 
+	"github.com/bkildow/wt-cli/internal/config"
 	"github.com/bkildow/wt-cli/internal/git"
 	"github.com/bkildow/wt-cli/internal/project"
 	"github.com/bkildow/wt-cli/internal/ui"
@@ -20,6 +24,8 @@ func newAddCmd() *cobra.Command {
 		RunE:  runAdd,
 	}
 	cmd.Flags().Bool("skip-setup", false, "Skip running setup hooks after creating the worktree")
+	cmd.Flags().Bool("background", false, "Run setup hooks in the background")
+	cmd.Flags().Bool("foreground", false, "Run setup hooks in the foreground (blocking)")
 	return cmd
 }
 
@@ -34,6 +40,11 @@ func runAdd(cmd *cobra.Command, args []string) error {
 
 	gitDir := project.GitDirPath(projectRoot, cfg)
 	runner := git.NewRunner(gitDir, dry)
+
+	// Ensure git excludes are configured (idempotent, self-heals existing projects).
+	if err := project.EnsureGitExclude(gitDir, dry); err != nil {
+		ui.Warning("Could not configure git excludes: " + err.Error())
+	}
 
 	ui.Step("Fetching all remotes")
 	if err := runner.FetchAll(ctx); err != nil {
@@ -96,22 +107,140 @@ func runAdd(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	var setupErr error
+	msg := fmt.Sprintf("Worktree created: %s/%s (%d copied, %d symlinked)",
+		cfg.WorktreeDir, branch, result.Copied, result.Symlinked)
+
+	hasHooks := len(cfg.Setup) > 0 || len(cfg.ParallelSetup) > 0
 	skipSetup, _ := cmd.Flags().GetBool("skip-setup")
-	if !skipSetup {
-		setupErr = project.RunSetupHooks(ctx, cfg, worktreePath, dry)
-		if pErr := project.RunParallelSetupHooks(ctx, cfg, worktreePath, dry); pErr != nil {
-			setupErr = errors.Join(setupErr, pErr)
+
+	if skipSetup && hasHooks {
+		if !dry {
+			state := &project.SetupState{
+				Status:      project.SetupSkipped,
+				StartedAt:   time.Now(),
+				CompletedAt: time.Now(),
+			}
+			if err := project.WriteSetupState(worktreePath, state); err != nil {
+				ui.Warning("Failed to write setup state: " + err.Error())
+			}
+		}
+		ui.Success(msg)
+		fmt.Println(worktreePath)
+		return nil
+	}
+
+	if !hasHooks {
+		ui.Success(msg)
+		fmt.Println(worktreePath)
+		return nil
+	}
+
+	background, err := resolveBackgroundMode(cmd, cfg)
+	if err != nil {
+		return err
+	}
+
+	if background {
+		return runSetupBackground(projectRoot, worktreePath, cfg, dry, msg)
+	}
+
+	return runSetupForeground(cmd, worktreePath, cfg, dry, msg)
+}
+
+// resolveBackgroundMode determines whether setup should run in background.
+// Priority: --background flag > --foreground flag > config value > false.
+func resolveBackgroundMode(cmd *cobra.Command, cfg *config.Config) (bool, error) {
+	bg, _ := cmd.Flags().GetBool("background")
+	fg, _ := cmd.Flags().GetBool("foreground")
+	if bg && fg {
+		return false, fmt.Errorf("--background and --foreground are mutually exclusive")
+	}
+	if bg {
+		return true, nil
+	}
+	if fg {
+		return false, nil
+	}
+	return cfg.BackgroundSetup, nil
+}
+
+func runSetupForeground(cmd *cobra.Command, worktreePath string, cfg *config.Config, dry bool, msg string) error {
+	ctx := cmd.Context()
+	startedAt := time.Now()
+
+	var setupErr error
+	setupErr = project.RunSetupHooks(ctx, cfg, worktreePath, dry, nil)
+	if pErr := project.RunParallelSetupHooks(ctx, cfg, worktreePath, dry); pErr != nil {
+		setupErr = errors.Join(setupErr, pErr)
+	}
+
+	if !dry {
+		state := &project.SetupState{
+			Status:         project.SetupComplete,
+			StartedAt:      startedAt,
+			CompletedAt:    time.Now(),
+			HooksTotal:     len(cfg.Setup) + len(cfg.ParallelSetup),
+			HooksCompleted: len(cfg.Setup) + len(cfg.ParallelSetup),
+		}
+		if setupErr != nil {
+			state.Status = project.SetupFailed
+			state.Error = setupErr.Error()
+		}
+		if err := project.WriteSetupState(worktreePath, state); err != nil {
+			ui.Warning("Failed to write setup state: " + err.Error())
 		}
 	}
 
-	msg := fmt.Sprintf("Worktree created: %s/%s (%d copied, %d symlinked)",
-		cfg.WorktreeDir, branch, result.Copied, result.Symlinked)
 	if setupErr != nil {
 		ui.Warning(msg + " — setup hooks failed")
 	} else {
 		ui.Success(msg)
 	}
+	fmt.Println(worktreePath)
+	return nil
+}
+
+func runSetupBackground(projectRoot, worktreePath string, cfg *config.Config, dry bool, msg string) error {
+	hooksTotal := len(cfg.Setup) + len(cfg.ParallelSetup)
+
+	if dry {
+		ui.DryRunNotice("would launch background setup process")
+		ui.Success(msg)
+		fmt.Println(worktreePath)
+		return nil
+	}
+
+	exe, err := os.Executable()
+	if err != nil {
+		return fmt.Errorf("cannot find wt binary: %w", err)
+	}
+
+	child := exec.Command(exe, "_run-setup",
+		"--worktree-path", worktreePath,
+		"--project-root", projectRoot,
+	)
+	child.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
+	child.Stdout = nil
+	child.Stderr = nil
+
+	if err := child.Start(); err != nil {
+		return fmt.Errorf("failed to start background setup: %w", err)
+	}
+
+	// Write initial state with the real PID (child will overwrite with progress).
+	state := &project.SetupState{
+		Status:     project.SetupRunning,
+		PID:        child.Process.Pid,
+		StartedAt:  time.Now(),
+		HooksTotal: hooksTotal,
+		LogFile:    project.SetupLogPath(worktreePath),
+	}
+	if err := project.WriteSetupState(worktreePath, state); err != nil {
+		ui.Warning("Failed to write setup state: " + err.Error())
+	}
+
+	ui.Success(msg)
+	ui.Step("Setup is running in the background. Run 'wt status' to check progress.")
 	fmt.Println(worktreePath)
 	return nil
 }

@@ -15,7 +15,7 @@ func TestRunSetupHooks(t *testing.T) {
 	}
 	wt := t.TempDir()
 
-	err := RunSetupHooks(context.Background(), cfg, wt, false)
+	err := RunSetupHooks(context.Background(), cfg, wt, false, nil)
 	if err != nil {
 		t.Fatalf("RunSetupHooks error: %v", err)
 	}
@@ -27,7 +27,7 @@ func TestRunSetupHooksDryRun(t *testing.T) {
 	}
 	wt := t.TempDir()
 
-	err := RunSetupHooks(context.Background(), cfg, wt, true)
+	err := RunSetupHooks(context.Background(), cfg, wt, true, nil)
 	if err != nil {
 		t.Fatalf("RunSetupHooks dry-run error: %v", err)
 	}
@@ -39,7 +39,7 @@ func TestRunSetupHooksFailure(t *testing.T) {
 	}
 	wt := t.TempDir()
 
-	err := RunSetupHooks(context.Background(), cfg, wt, false)
+	err := RunSetupHooks(context.Background(), cfg, wt, false, nil)
 	if err == nil {
 		t.Fatal("expected error from failing hook")
 	}
@@ -49,7 +49,7 @@ func TestRunSetupHooksEmpty(t *testing.T) {
 	cfg := &config.Config{}
 	wt := t.TempDir()
 
-	err := RunSetupHooks(context.Background(), cfg, wt, false)
+	err := RunSetupHooks(context.Background(), cfg, wt, false, nil)
 	if err != nil {
 		t.Fatalf("RunSetupHooks with empty hooks error: %v", err)
 	}
@@ -61,7 +61,7 @@ func TestRunSetupHooksContinuesOnFailure(t *testing.T) {
 	}
 	wt := t.TempDir()
 
-	err := RunSetupHooks(context.Background(), cfg, wt, false)
+	err := RunSetupHooks(context.Background(), cfg, wt, false, nil)
 	if err == nil {
 		t.Fatal("expected error from failing hook")
 	}

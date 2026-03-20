@@ -32,6 +32,7 @@ type Config struct {
 	ParallelSetup    []string `yaml:"parallel_setup,omitempty"`
 	Teardown         []string `yaml:"teardown,omitempty"`
 	ParallelTeardown []string `yaml:"parallel_teardown,omitempty"`
+	BackgroundSetup  bool     `yaml:"background_setup,omitempty"`
 	Editor           string   `yaml:"editor,omitempty"`
 }
 
@@ -121,6 +122,14 @@ func renderAnnotatedConfig(cfg *Config) string {
 		fmt.Fprintf(&b, "editor: %s\n", cfg.Editor)
 	} else {
 		b.WriteString("# editor: cursor\n")
+	}
+
+	b.WriteString("\n# Run setup hooks in the background (default: false)\n")
+	b.WriteString("# Override per-command with --background or --foreground\n")
+	if cfg != nil && cfg.BackgroundSetup {
+		b.WriteString("background_setup: true\n")
+	} else {
+		b.WriteString("# background_setup: false\n")
 	}
 
 	b.WriteString("\n# Commands to run after creating a new worktree\n")
