@@ -73,24 +73,47 @@ func newClaudeHookWorktreeRemoveCmd() *cobra.Command {
 }
 
 func runClaudeInit(cmd *cobra.Command, _ []string) error {
-	projectRoot, _, err := loadProject()
+	ctx := cmd.Context()
+
+	projectRoot, cfg, err := loadProject()
 	if err != nil {
 		return err
 	}
 
 	wtBinary, _ := cmd.Flags().GetString("binary")
 
-	if claude.IsHooksConfigured(projectRoot) {
+	// Write hooks to shared/symlink so all worktrees get a symlink via wt apply.
+	sharedTarget := filepath.Join(projectRoot, cfg.SharedDir, "symlink")
+
+	if claude.IsHooksConfigured(sharedTarget) {
 		ui.Info("Claude Code hooks are already configured, updating...")
 	}
 
-	if err := claude.ConfigureHooks(projectRoot, wtBinary); err != nil {
+	if err := claude.ConfigureHooks(sharedTarget, wtBinary); err != nil {
 		return fmt.Errorf("failed to configure hooks: %w", err)
 	}
 
-	ui.Success("Configured Claude Code hooks in .claude/settings.local.json")
+	ui.Success("Configured Claude Code hooks in shared/symlink/.claude/settings.local.json")
 	ui.Info("  WorktreeCreate -> " + wtBinary + " claude hook-worktree-create")
 	ui.Info("  WorktreeRemove -> " + wtBinary + " claude hook-worktree-remove")
+
+	// Apply to all existing worktrees so they get the symlink immediately.
+	gitDir := project.GitDirPath(projectRoot, cfg)
+	runner := git.NewRunner(gitDir, false)
+	worktrees, err := runner.WorktreeList(ctx)
+	if err != nil {
+		ui.Warning("Could not list worktrees: " + err.Error())
+		return nil
+	}
+	filtered := filterManagedWorktrees(worktrees, projectRoot)
+	for _, wt := range filtered {
+		vars := project.NewTemplateVars(projectRoot, wt.Path, wt.Branch)
+		if _, err := project.Apply(projectRoot, wt.Path, cfg, false, &vars); err != nil {
+			ui.Warning(fmt.Sprintf("Could not apply to worktree %s: %s", wt.Branch, err.Error()))
+		}
+	}
+	ui.Success(fmt.Sprintf("Applied hooks to %d existing worktrees", len(filtered)))
+
 	return nil
 }
 
@@ -106,15 +129,14 @@ func runClaudeHookWorktreeCreate(cmd *cobra.Command, _ []string) error {
 	gitDir := project.GitDirPath(projectRoot, cfg)
 	runner := git.NewRunner(gitDir, false)
 
-	// Ensure git excludes are configured.
+	// Ensure git excludes are configured (non-fatal if sandbox blocks it).
 	if err := project.EnsureGitExclude(gitDir, false); err != nil {
 		ui.Warning("Could not configure git excludes: " + err.Error())
 	}
 
-	ui.Step("Fetching all remotes")
-	if err := runner.FetchAll(ctx); err != nil {
-		return fmt.Errorf("fetch failed: %w", err)
-	}
+	// Skip git fetch — Claude Code hooks run in a sandbox that restricts
+	// writes to .bare/, and fetch requires network access. HasRemoteBranch
+	// uses git branch -r (local only) which is sufficient.
 
 	branch := hctx.payload.Name
 	worktreePath := filepath.Join(project.WorktreesPath(projectRoot, cfg), branch)
@@ -231,11 +253,11 @@ func loadHookContext() (*hookContext, error) {
 
 	// Validate required fields based on event type.
 	switch payload.HookEventName {
-	case "WorktreeCreate":
+	case claude.HookWorktreeCreate:
 		if payload.Name == "" {
 			return nil, fmt.Errorf("name is required in WorktreeCreate payload")
 		}
-	case "WorktreeRemove":
+	case claude.HookWorktreeRemove:
 		if payload.WorktreePath == "" {
 			return nil, fmt.Errorf("worktree_path is required in WorktreeRemove payload")
 		}
