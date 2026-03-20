@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"os"
 	"os/exec"
 	"sync"
 
@@ -70,6 +71,7 @@ func RunSetupHooks(ctx context.Context, cfg *config.Config, worktreePath string,
 
 		cmd := exec.CommandContext(ctx, "sh", "-c", cmdStr)
 		cmd.Dir = worktreePath
+		cmd.Stdin = os.Stdin
 		cmd.Stdout = ui.Output
 		cmd.Stderr = ui.Output
 
@@ -111,6 +113,7 @@ func RunTeardownHooks(ctx context.Context, cfg *config.Config, worktreePath stri
 
 		cmd := exec.CommandContext(ctx, "sh", "-c", cmdStr)
 		cmd.Dir = worktreePath
+		cmd.Stdin = os.Stdin
 		cmd.Stdout = ui.Output
 		cmd.Stderr = ui.Output
 
@@ -169,6 +172,7 @@ func runParallelHooks(ctx context.Context, hooks []string, worktreePath string, 
 			pw := &prefixWriter{prefix: cmdStr, mu: &outputMu}
 			cmd := exec.CommandContext(ctx, "sh", "-c", cmdStr)
 			cmd.Dir = worktreePath
+			cmd.Stdin = os.Stdin
 			cmd.Stdout = pw
 			cmd.Stderr = pw
 
