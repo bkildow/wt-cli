@@ -15,7 +15,7 @@ func newCdCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:               "cd [name]",
 		Short:             "Print worktree path for shell navigation",
-		Long:              "Prints the absolute path of a worktree. Use with: cd \"$(wt cd)\"",
+		Long:              "Prints the absolute path of a worktree. Use with: cd \"$(wt cd)\"\n\nUse \"wt cd ..\" to navigate to the project root (same as \"wt root\").",
 		Args:              cobra.MaximumNArgs(1),
 		ValidArgsFunction: completeWorktreeNames,
 		RunE:              runCd,
@@ -32,6 +32,12 @@ func runCd(cmd *cobra.Command, args []string) error {
 	projectRoot, cfg, err := loadProject()
 	if err != nil {
 		return err
+	}
+
+	// "wt cd .." is a shortcut for "wt root"
+	if len(args) > 0 && args[0] == ".." {
+		fmt.Println(projectRoot)
+		return nil
 	}
 
 	runner := git.NewRunner(project.GitDirPath(projectRoot, cfg), IsDryRun())
