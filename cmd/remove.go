@@ -39,6 +39,7 @@ func runRemove(cmd *cobra.Command, args []string) error {
 	}
 
 	filtered := filterManagedWorktrees(worktrees, projectRoot)
+	mainBranch := cfg.MainBranchOrDefault()
 
 	if len(filtered) == 0 {
 		return fmt.Errorf("no worktrees found")
@@ -78,11 +79,6 @@ func runRemove(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	// Protect the main branch from accidental removal.
-	if selected.Branch == cfg.MainBranchOrDefault() {
-		return fmt.Errorf("cannot remove the main branch worktree (%s)", selected.Branch)
-	}
-
 	force, _ := cmd.Flags().GetBool("force")
 
 	if !force {
@@ -108,13 +104,22 @@ func runRemove(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	ui.Step("Removing worktree: " + selected.Branch)
+	isMainBranch := selected.Branch == mainBranch
+
+	if isMainBranch {
+		ui.Step("Removing worktree: " + selected.Branch + " (branch preserved in bare repo)")
+	} else {
+		ui.Step("Removing worktree: " + selected.Branch)
+	}
+
 	if err := runner.WorktreeRemove(ctx, selected.Path, force); err != nil {
 		return err
 	}
 
-	if err := runner.BranchDelete(ctx, selected.Branch, false); err != nil {
-		ui.Warning("Could not delete branch: " + err.Error())
+	if !isMainBranch {
+		if err := runner.BranchDelete(ctx, selected.Branch, false); err != nil {
+			ui.Warning("Could not delete branch: " + err.Error())
+		}
 	}
 
 	ui.Success("Removed worktree: " + selected.Branch)

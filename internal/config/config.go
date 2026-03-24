@@ -126,7 +126,7 @@ func renderAnnotatedConfig(cfg *Config) string {
 		fmt.Fprintf(&b, "shared_dir: %s\n", DefaultSharedDir)
 	}
 
-	b.WriteString("\n# The primary branch of the repository (used as base for new branches, protected from removal)\n")
+	b.WriteString("\n# The primary branch of the repository (used as base for new branches, branch ref protected from deletion)\n")
 	if cfg != nil && cfg.MainBranch != "" {
 		fmt.Fprintf(&b, "main_branch: %s\n", cfg.MainBranch)
 	} else {

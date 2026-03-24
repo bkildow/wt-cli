@@ -53,12 +53,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 	// Detect the repository's default branch
 	gitDir := filepath.Join(projectRoot, cfg.GitDir)
 	initRunner := git.NewRunner(gitDir, dry)
-	detectedBranch, err := initRunner.GetDefaultBranch(cmd.Context())
-	if err != nil {
-		ui.Warning("Could not detect default branch, defaulting to 'main'")
-		detectedBranch = config.DefaultMainBranch
-	}
-	cfg.MainBranch = detectedBranch
+	cfg.MainBranch = detectDefaultBranch(cmd.Context(), initRunner)
 
 	// Create scaffold directories
 	ui.Step("Creating project scaffold")
