@@ -11,6 +11,40 @@ import (
 	"github.com/bkildow/wt-cli/internal/ui"
 )
 
+func TestBatchEnv(t *testing.T) {
+	env := batchEnv()
+
+	var hasTerminalPrompt, hasSSH bool
+	for _, v := range env {
+		if v == "GIT_TERMINAL_PROMPT=0" {
+			hasTerminalPrompt = true
+		}
+		if strings.HasPrefix(v, "GIT_SSH_COMMAND=") && strings.Contains(v, "BatchMode=yes") {
+			hasSSH = true
+		}
+	}
+	if !hasTerminalPrompt {
+		t.Error("batchEnv missing GIT_TERMINAL_PROMPT=0")
+	}
+	if !hasSSH {
+		t.Error("batchEnv missing GIT_SSH_COMMAND with BatchMode=yes")
+	}
+}
+
+func TestRunnerBatchMode(t *testing.T) {
+	// BatchMode defaults to false.
+	r := NewRunner("/tmp/fake", false)
+	if r.BatchMode {
+		t.Error("BatchMode should default to false")
+	}
+
+	// Setting BatchMode should not affect DryRun.
+	r.BatchMode = true
+	if r.DryRun {
+		t.Error("setting BatchMode should not affect DryRun")
+	}
+}
+
 func TestParseRemoteBranches(t *testing.T) {
 	tests := []struct {
 		name   string

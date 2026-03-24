@@ -86,6 +86,21 @@ func TestReadHookPayload_noEOF(t *testing.T) {
 	_ = pw.Close()
 }
 
+func TestReadHookPayload_timeout(t *testing.T) {
+	// Simulate a pipe that is open but never sends any data.
+	// readHookPayload should time out instead of blocking forever.
+	pr, pw := io.Pipe()
+	defer func() { _ = pw.Close() }()
+
+	_, err := readHookPayload(pr)
+	if err == nil {
+		t.Fatal("expected timeout error")
+	}
+	if !strings.Contains(err.Error(), "timed out") {
+		t.Errorf("error = %q, want timeout message", err.Error())
+	}
+}
+
 func TestResolveProjectRoot_noProject(t *testing.T) {
 	payload := hookPayload{
 		Cwd: "/nonexistent/path",

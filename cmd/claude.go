@@ -1,11 +1,14 @@
 package cmd
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/bkildow/wt-cli/internal/claude"
 	"github.com/bkildow/wt-cli/internal/config"
@@ -13,6 +16,14 @@ import (
 	"github.com/bkildow/wt-cli/internal/project"
 	"github.com/bkildow/wt-cli/internal/ui"
 	"github.com/spf13/cobra"
+)
+
+// Timeouts for hook operations. Hooks run inside Claude Code's sandbox,
+// so they must complete promptly or risk blocking the agent session.
+const (
+	hookCreateTimeout  = 60 * time.Second
+	hookRemoveTimeout  = 30 * time.Second
+	hookPayloadTimeout = 5 * time.Second
 )
 
 // hookPayload is the JSON structure Claude Code sends on stdin for hook events.
@@ -118,7 +129,8 @@ func runClaudeInit(cmd *cobra.Command, _ []string) error {
 }
 
 func runClaudeHookWorktreeCreate(cmd *cobra.Command, _ []string) error {
-	ctx := cmd.Context()
+	ctx, cancel := context.WithTimeout(cmd.Context(), hookCreateTimeout)
+	defer cancel()
 
 	hctx, err := loadHookContext()
 	if err != nil {
@@ -128,6 +140,7 @@ func runClaudeHookWorktreeCreate(cmd *cobra.Command, _ []string) error {
 	projectRoot, cfg := hctx.projectRoot, hctx.cfg
 	gitDir := project.GitDirPath(projectRoot, cfg)
 	runner := git.NewRunner(gitDir, false)
+	runner.BatchMode = true
 
 	// Ensure git excludes are configured (non-fatal if sandbox blocks it).
 	if err := project.EnsureGitExclude(gitDir, false); err != nil {
@@ -141,10 +154,18 @@ func runClaudeHookWorktreeCreate(cmd *cobra.Command, _ []string) error {
 	branch := hctx.payload.Name
 	worktreePath := filepath.Join(project.WorktreesPath(projectRoot, cfg), branch)
 
-	// If the worktree already exists, just return its path.
-	if _, err := os.Stat(worktreePath); err == nil {
+	// If the worktree already exists and is valid, just return its path.
+	gitMarker := filepath.Join(worktreePath, ".git")
+	if _, err := os.Stat(gitMarker); err == nil {
 		fmt.Println(worktreePath)
 		return nil
+	}
+	// Directory exists but is not a valid worktree — clean up leftover from failed create.
+	if _, err := os.Stat(worktreePath); err == nil {
+		ui.Warning("Directory exists but is not a valid worktree, recreating: " + worktreePath)
+		if err := os.RemoveAll(worktreePath); err != nil {
+			return fmt.Errorf("failed to clean up invalid worktree directory: %w", err)
+		}
 	}
 
 	hasRemote, err := runner.HasRemoteBranch(ctx, branch)
@@ -192,7 +213,8 @@ func runClaudeHookWorktreeCreate(cmd *cobra.Command, _ []string) error {
 }
 
 func runClaudeHookWorktreeRemove(cmd *cobra.Command, _ []string) error {
-	ctx := cmd.Context()
+	ctx, cancel := context.WithTimeout(cmd.Context(), hookRemoveTimeout)
+	defer cancel()
 
 	hctx, err := loadHookContext()
 	if err != nil {
@@ -222,11 +244,12 @@ func runClaudeHookWorktreeRemove(cmd *cobra.Command, _ []string) error {
 
 	gitDir := project.GitDirPath(projectRoot, cfg)
 	runner := git.NewRunner(gitDir, false)
+	runner.BatchMode = true
 
 	// Force remove — Claude agents may have uncommitted changes.
 	ui.Step("Removing worktree: " + branch)
 	if err := runner.WorktreeRemove(ctx, worktreePath, true); err != nil {
-		ui.Warning("Worktree remove failed: " + err.Error())
+		return fmt.Errorf("worktree remove failed: %w", err)
 	}
 
 	if err := runner.BranchDelete(ctx, branch, false); err != nil {
@@ -250,6 +273,12 @@ func loadHookContext() (*hookContext, error) {
 	payload, err := readHookPayload(os.Stdin)
 	if err != nil {
 		return nil, err
+	}
+
+	// Replace process stdin with /dev/null so downstream operations
+	// (teardown hooks, git commands) cannot read from Claude Code's pipe.
+	if devNull, err := os.Open(os.DevNull); err == nil {
+		os.Stdin = devNull
 	}
 
 	// Validate required fields based on event type.
@@ -276,17 +305,31 @@ func loadHookContext() (*hookContext, error) {
 }
 
 // readHookPayload parses the JSON hook payload from the given reader.
-// Uses json.NewDecoder so it returns as soon as one JSON object is read,
-// without waiting for EOF (which may never arrive from Claude Code's pipe).
+// Claude Code's pipe may never send EOF, so a timeout prevents indefinite blocking.
 func readHookPayload(r io.Reader) (hookPayload, error) {
-	var payload hookPayload
-	if err := json.NewDecoder(r).Decode(&payload); err != nil {
-		if err == io.EOF {
-			return hookPayload{}, fmt.Errorf("no payload received on stdin")
-		}
-		return hookPayload{}, fmt.Errorf("invalid JSON payload: %w", err)
+	type result struct {
+		payload hookPayload
+		err     error
 	}
-	return payload, nil
+	ch := make(chan result, 1)
+	go func() {
+		var p hookPayload
+		err := json.NewDecoder(r).Decode(&p)
+		ch <- result{p, err}
+	}()
+
+	select {
+	case res := <-ch:
+		if res.err != nil {
+			if errors.Is(res.err, io.EOF) {
+				return hookPayload{}, fmt.Errorf("no payload received on stdin")
+			}
+			return hookPayload{}, fmt.Errorf("invalid JSON payload: %w", res.err)
+		}
+		return res.payload, nil
+	case <-time.After(hookPayloadTimeout):
+		return hookPayload{}, fmt.Errorf("timed out waiting for hook payload on stdin (no data received within 5s)")
+	}
 }
 
 // resolveProjectRoot determines the project root from the hook payload.
