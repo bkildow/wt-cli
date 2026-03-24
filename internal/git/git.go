@@ -27,6 +27,7 @@ type Git interface {
 	Fetch(ctx context.Context, remote string) error
 	ListRemoteBranches(ctx context.Context) ([]string, error)
 	HasRemoteBranch(ctx context.Context, branch string) (bool, error)
+	HasLocalBranch(ctx context.Context, branch string) (bool, error)
 	WorktreeAdd(ctx context.Context, path, branch string) error
 	WorktreeAddNew(ctx context.Context, path, branch string) error
 	WorktreeRemove(ctx context.Context, path string, force bool) error
@@ -148,6 +149,14 @@ func (r *Runner) HasRemoteBranch(ctx context.Context, branch string) (bool, erro
 		}
 	}
 	return false, nil
+}
+
+func (r *Runner) HasLocalBranch(ctx context.Context, branch string) (bool, error) {
+	_, err := r.Run(ctx, "rev-parse", "--verify", "refs/heads/"+branch)
+	if err != nil {
+		return false, nil
+	}
+	return true, nil
 }
 
 func (r *Runner) WorktreeAdd(ctx context.Context, path, branch string) error {
