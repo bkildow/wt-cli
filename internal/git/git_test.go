@@ -129,6 +129,15 @@ func TestDryRunMode(t *testing.T) {
 		t.Errorf("dry-run HasRemoteBranch should return false")
 	}
 
+	// HasLocalBranch (dry-run returns true since Run returns nil error)
+	hasLocal, err := runner.HasLocalBranch(ctx, "main")
+	if err != nil {
+		t.Errorf("dry-run HasLocalBranch returned error: %v", err)
+	}
+	if !hasLocal {
+		t.Errorf("dry-run HasLocalBranch should return true")
+	}
+
 	// WorktreeAddNew
 	if err := runner.WorktreeAddNew(ctx, "/tmp/wt", "feature-x", "main"); err != nil {
 		t.Errorf("dry-run WorktreeAddNew returned error: %v", err)

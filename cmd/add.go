@@ -89,8 +89,13 @@ func runAdd(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	hasLocal, err := runner.HasLocalBranch(ctx, branch)
+	if err != nil {
+		return err
+	}
+
 	ui.Step("Adding worktree for branch: " + branch)
-	if hasRemote {
+	if hasRemote || hasLocal {
 		if err := runner.WorktreeAdd(ctx, worktreePath, branch); err != nil {
 			return err
 		}
