@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	lipgloss "charm.land/lipgloss/v2"
@@ -26,15 +28,17 @@ func newRunSetupCmd() *cobra.Command {
 	return cmd
 }
 
-func runRunSetup(cmd *cobra.Command, args []string) error {
-	ctx := cmd.Context()
-
+func runRunSetup(cmd *cobra.Command, _ []string) error {
 	worktreePath, _ := cmd.Flags().GetString("worktree-path")
 	projectRoot, _ := cmd.Flags().GetString("project-root")
 
 	if worktreePath == "" || projectRoot == "" {
 		return fmt.Errorf("--worktree-path and --project-root are required")
 	}
+
+	// Cancel context on SIGTERM/SIGINT so running hooks are stopped.
+	ctx, stop := signal.NotifyContext(cmd.Context(), syscall.SIGTERM, syscall.SIGINT)
+	defer stop()
 
 	cfg, err := config.Load(projectRoot)
 	if err != nil {
@@ -65,6 +69,16 @@ func runRunSetup(cmd *cobra.Command, args []string) error {
 	if err := project.WriteSetupState(worktreePath, state); err != nil {
 		return err
 	}
+
+	// Mark setup as failed if we exit while still "running" (e.g., signal, panic).
+	defer func() {
+		if state.Status == project.SetupRunning {
+			state.Status = project.SetupFailed
+			state.Error = "setup process terminated unexpectedly"
+			state.CompletedAt = time.Now()
+			_ = project.WriteSetupState(worktreePath, state)
+		}
+	}()
 
 	var setupErr error
 

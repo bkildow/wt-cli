@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"os/exec"
 	"strconv"
 	"strings"
@@ -45,12 +46,21 @@ type Git interface {
 }
 
 type Runner struct {
-	GitDir string
-	DryRun bool
+	GitDir    string
+	DryRun    bool
+	BatchMode bool // Suppress interactive prompts (for non-TTY environments like hooks)
 }
 
 func NewRunner(gitDir string, dryRun bool) *Runner {
 	return &Runner{GitDir: gitDir, DryRun: dryRun}
+}
+
+// batchEnv returns environment variables that suppress interactive git prompts.
+func batchEnv() []string {
+	env := os.Environ()
+	env = append(env, "GIT_TERMINAL_PROMPT=0")
+	env = append(env, "GIT_SSH_COMMAND=ssh -o BatchMode=yes")
+	return env
 }
 
 func (r *Runner) Run(ctx context.Context, args ...string) (string, error) {
@@ -67,6 +77,9 @@ func (r *Runner) Run(ctx context.Context, args ...string) (string, error) {
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
+	if r.BatchMode {
+		cmd.Env = batchEnv()
+	}
 
 	if err := cmd.Run(); err != nil {
 		return "", fmt.Errorf("%s: %w\n%s", cmdStr, err, stderr.String())
