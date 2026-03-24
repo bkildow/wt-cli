@@ -31,3 +31,13 @@ stderr 'Removed worktree'
 # List should show only main
 exec wt list
 stderr 'main'
+
+# Remove the main branch worktree (should succeed, branch preserved)
+exec wt remove main
+stderr 'branch preserved'
+stderr 'Removed worktree'
+! exists worktrees/main
+
+# Re-add the main branch worktree
+exec wt add --skip-setup main
+exists worktrees/main

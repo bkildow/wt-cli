@@ -150,6 +150,14 @@ func (r *Runner) HasRemoteBranch(ctx context.Context, branch string) (bool, erro
 	return false, nil
 }
 
+func (r *Runner) HasLocalBranch(ctx context.Context, branch string) (bool, error) {
+	_, err := r.Run(ctx, "rev-parse", "--verify", "refs/heads/"+branch)
+	if err != nil {
+		return false, nil
+	}
+	return true, nil
+}
+
 func (r *Runner) WorktreeAdd(ctx context.Context, path, branch string) error {
 	_, err := r.Run(ctx, "worktree", "add", "--relative-paths", path, branch)
 	return err

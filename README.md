@@ -257,7 +257,7 @@ parallel_teardown:
 |-------|-------------|---------|
 | `version` | Config version | `1` |
 | `git_dir` | Path to bare repository | `.bare` |
-| `main_branch` | Primary branch (protected from removal, used as base for new branches) | `main` |
+| `main_branch` | Primary branch (branch ref protected from deletion, used as base for new branches) | `main` |
 | `editor` | Preferred editor binary name | (auto-detect) |
 | `setup` | Commands to run sequentially after creating a worktree | `[]` |
 | `parallel_setup` | Commands to run concurrently after serial setup hooks | `[]` |

@@ -48,9 +48,6 @@ func runRemove(cmd *cobra.Command, args []string) error {
 
 	var selected git.WorktreeInfo
 	if len(args) > 0 {
-		if args[0] == mainBranch {
-			return fmt.Errorf("cannot remove the main branch worktree (%s)", mainBranch)
-		}
 		found := false
 		for _, wt := range filtered {
 			if wt.Branch == args[0] {
@@ -63,18 +60,8 @@ func runRemove(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("worktree not found: %s", args[0])
 		}
 	} else {
-		// Exclude the main branch from the interactive picker.
-		var removable []git.WorktreeInfo
-		for _, wt := range filtered {
-			if wt.Branch != mainBranch {
-				removable = append(removable, wt)
-			}
-		}
-		if len(removable) == 0 {
-			return fmt.Errorf("no removable worktrees found (only the main branch exists)")
-		}
-		names := make([]string, len(removable))
-		for i, wt := range removable {
+		names := make([]string, len(filtered))
+		for i, wt := range filtered {
 			names[i] = wt.Branch
 		}
 		prompter := &ui.InteractivePrompter{}
@@ -85,7 +72,7 @@ func runRemove(cmd *cobra.Command, args []string) error {
 			}
 			return err
 		}
-		for _, wt := range removable {
+		for _, wt := range filtered {
 			if wt.Branch == name {
 				selected = wt
 				break
@@ -118,13 +105,22 @@ func runRemove(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	ui.Step("Removing worktree: " + selected.Branch)
+	isMainBranch := selected.Branch == mainBranch
+
+	if isMainBranch {
+		ui.Step("Removing worktree: " + selected.Branch + " (branch preserved in bare repo)")
+	} else {
+		ui.Step("Removing worktree: " + selected.Branch)
+	}
+
 	if err := runner.WorktreeRemove(ctx, selected.Path, force); err != nil {
 		return err
 	}
 
-	if err := runner.BranchDelete(ctx, selected.Branch, false); err != nil {
-		ui.Warning("Could not delete branch: " + err.Error())
+	if !isMainBranch {
+		if err := runner.BranchDelete(ctx, selected.Branch, false); err != nil {
+			ui.Warning("Could not delete branch: " + err.Error())
+		}
 	}
 
 	ui.Success("Removed worktree: " + selected.Branch)
