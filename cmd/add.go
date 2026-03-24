@@ -96,7 +96,8 @@ func runAdd(cmd *cobra.Command, args []string) error {
 			return err
 		}
 	} else {
-		if err := runner.WorktreeAddNew(ctx, worktreePath, branch); err != nil {
+		startPoint := runner.ResolveStartPoint(ctx, cfg.MainBranchOrDefault())
+		if err := runner.WorktreeAddNew(ctx, worktreePath, branch, startPoint); err != nil {
 			return err
 		}
 	}

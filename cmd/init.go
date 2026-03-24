@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/bkildow/wt-cli/internal/config"
+	"github.com/bkildow/wt-cli/internal/git"
 	"github.com/bkildow/wt-cli/internal/project"
 	"github.com/bkildow/wt-cli/internal/ui"
 	"github.com/spf13/cobra"
@@ -49,6 +50,16 @@ func runInit(cmd *cobra.Command, args []string) error {
 	cfg.WorktreeDir = ".worktrees"
 	cfg.SharedDir = ".worktrees/shared"
 
+	// Detect the repository's default branch
+	gitDir := filepath.Join(projectRoot, cfg.GitDir)
+	initRunner := git.NewRunner(gitDir, dry)
+	detectedBranch, err := initRunner.GetDefaultBranch(cmd.Context())
+	if err != nil {
+		ui.Warning("Could not detect default branch, defaulting to 'main'")
+		detectedBranch = config.DefaultMainBranch
+	}
+	cfg.MainBranch = detectedBranch
+
 	// Create scaffold directories
 	ui.Step("Creating project scaffold")
 	if err := project.CreateScaffold(projectRoot, &cfg, dry); err != nil {
@@ -56,7 +67,6 @@ func runInit(cmd *cobra.Command, args []string) error {
 	}
 
 	// Configure local git excludes for wt-managed files
-	gitDir := filepath.Join(projectRoot, cfg.GitDir)
 	ui.Step("Configuring local git excludes")
 	if err := project.EnsureGitExclude(gitDir, dry); err != nil {
 		return err

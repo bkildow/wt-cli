@@ -16,6 +16,7 @@ const (
 	DefaultGitDir      = ".bare"
 	DefaultWorktreeDir = "worktrees"
 	DefaultSharedDir   = "shared"
+	DefaultMainBranch  = "main"
 )
 
 var (
@@ -28,12 +29,21 @@ type Config struct {
 	GitDir           string   `yaml:"git_dir"`
 	WorktreeDir      string   `yaml:"worktree_dir"`
 	SharedDir        string   `yaml:"shared_dir"`
+	MainBranch       string   `yaml:"main_branch,omitempty"`
 	Setup            []string `yaml:"setup,omitempty"`
 	ParallelSetup    []string `yaml:"parallel_setup,omitempty"`
 	Teardown         []string `yaml:"teardown,omitempty"`
 	ParallelTeardown []string `yaml:"parallel_teardown,omitempty"`
 	BackgroundSetup  bool     `yaml:"background_setup,omitempty"`
 	Editor           string   `yaml:"editor,omitempty"`
+}
+
+// MainBranchOrDefault returns the configured main branch, falling back to DefaultMainBranch.
+func (c *Config) MainBranchOrDefault() string {
+	if c.MainBranch != "" {
+		return c.MainBranch
+	}
+	return DefaultMainBranch
 }
 
 func DefaultConfig() Config {
@@ -114,6 +124,13 @@ func renderAnnotatedConfig(cfg *Config) string {
 		fmt.Fprintf(&b, "shared_dir: %s\n", cfg.SharedDir)
 	} else {
 		fmt.Fprintf(&b, "shared_dir: %s\n", DefaultSharedDir)
+	}
+
+	b.WriteString("\n# The primary branch of the repository (used as base for new branches, protected from removal)\n")
+	if cfg != nil && cfg.MainBranch != "" {
+		fmt.Fprintf(&b, "main_branch: %s\n", cfg.MainBranch)
+	} else {
+		b.WriteString("# main_branch: main\n")
 	}
 
 	b.WriteString("\n# Editor for 'wt open' (e.g. cursor, code, zed)\n")
