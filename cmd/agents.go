@@ -159,6 +159,7 @@ After wt init (existing repo):
     version: 1
     git_dir: .bare                    # .bare for clone, .git for init
     worktree_dir: worktrees
+    main_branch: main                 # auto-detected at clone/init
     editor: cursor
     setup:
       - "npm install"
@@ -173,6 +174,7 @@ Fields:
 - version: Config version (always 1)
 - git_dir: Path to git directory (.bare for cloned, .git for initialized)
 - worktree_dir: Directory for worktrees (default: worktrees)
+- main_branch: Primary branch, protected from removal and used as base for new branches (default: main)
 - editor: Preferred editor binary name (default: auto-detect)
 - setup: Commands run sequentially after creating a worktree
 - parallel_setup: Commands run concurrently after setup completes

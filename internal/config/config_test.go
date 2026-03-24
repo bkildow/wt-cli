@@ -193,6 +193,11 @@ func TestWriteAnnotated(t *testing.T) {
 		t.Error("missing worktree_dir default")
 	}
 
+	// main_branch should be commented out
+	if !strings.Contains(content, "# main_branch: main") {
+		t.Error("main_branch should be commented out as example")
+	}
+
 	// Optional fields should be commented out
 	if !strings.Contains(content, "# editor: cursor") {
 		t.Error("editor should be commented out as example")
@@ -233,6 +238,7 @@ func TestWriteAnnotatedWithValues(t *testing.T) {
 		Version:     1,
 		GitDir:      ".bare",
 		WorktreeDir: "trees",
+		MainBranch:  "develop",
 		Setup:       []string{"npm install", "cp .env.example .env"},
 		Teardown:    []string{"docker compose down"},
 		Editor:      "cursor",
@@ -251,6 +257,14 @@ func TestWriteAnnotatedWithValues(t *testing.T) {
 	// Should contain documentation comments
 	if !strings.Contains(content, "# wt - worktree project configuration") {
 		t.Error("missing header comment")
+	}
+
+	// main_branch should be uncommented with existing value
+	if !strings.Contains(content, "main_branch: develop") {
+		t.Error("missing main_branch value")
+	}
+	if strings.Contains(content, "# main_branch:") {
+		t.Error("main_branch should not be commented out when value exists")
 	}
 
 	// Editor should be uncommented with existing value
@@ -336,6 +350,83 @@ func TestWriteAnnotatedWithGitDirDotGit(t *testing.T) {
 
 	if loaded.GitDir != ".git" {
 		t.Errorf("git_dir = %q, want %q", loaded.GitDir, ".git")
+	}
+}
+
+func TestMainBranchOrDefault(t *testing.T) {
+	t.Run("empty returns default", func(t *testing.T) {
+		cfg := Config{}
+		if got := cfg.MainBranchOrDefault(); got != DefaultMainBranch {
+			t.Errorf("MainBranchOrDefault() = %q, want %q", got, DefaultMainBranch)
+		}
+	})
+	t.Run("set value is returned", func(t *testing.T) {
+		cfg := Config{MainBranch: "develop"}
+		if got := cfg.MainBranchOrDefault(); got != "develop" {
+			t.Errorf("MainBranchOrDefault() = %q, want %q", got, "develop")
+		}
+	})
+}
+
+func TestLoadConfigWithMainBranch(t *testing.T) {
+	dir := t.TempDir()
+	content := `version: 1
+git_dir: .bare
+main_branch: develop
+`
+	if err := os.WriteFile(filepath.Join(dir, ConfigFileName), []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := Load(dir)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.MainBranch != "develop" {
+		t.Errorf("main_branch = %q, want %q", cfg.MainBranch, "develop")
+	}
+	if cfg.MainBranchOrDefault() != "develop" {
+		t.Errorf("MainBranchOrDefault() = %q, want %q", cfg.MainBranchOrDefault(), "develop")
+	}
+}
+
+func TestLoadConfigWithoutMainBranch(t *testing.T) {
+	dir := t.TempDir()
+	content := `version: 1
+git_dir: .bare
+`
+	if err := os.WriteFile(filepath.Join(dir, ConfigFileName), []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := Load(dir)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.MainBranch != "" {
+		t.Errorf("main_branch = %q, want empty (backward compat)", cfg.MainBranch)
+	}
+	if cfg.MainBranchOrDefault() != DefaultMainBranch {
+		t.Errorf("MainBranchOrDefault() = %q, want %q", cfg.MainBranchOrDefault(), DefaultMainBranch)
+	}
+}
+
+func TestSaveAndLoadMainBranchRoundTrip(t *testing.T) {
+	dir := t.TempDir()
+	original := &Config{
+		Version:    1,
+		GitDir:     ".bare",
+		MainBranch: "develop",
+	}
+	if err := original.Save(dir); err != nil {
+		t.Fatalf("save error: %v", err)
+	}
+	loaded, err := Load(dir)
+	if err != nil {
+		t.Fatalf("load error: %v", err)
+	}
+	if loaded.MainBranch != "develop" {
+		t.Errorf("main_branch = %q, want %q", loaded.MainBranch, "develop")
 	}
 }
 

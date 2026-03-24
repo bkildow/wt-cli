@@ -130,7 +130,7 @@ func TestDryRunMode(t *testing.T) {
 	}
 
 	// WorktreeAddNew
-	if err := runner.WorktreeAddNew(ctx, "/tmp/wt", "feature-x"); err != nil {
+	if err := runner.WorktreeAddNew(ctx, "/tmp/wt", "feature-x", "main"); err != nil {
 		t.Errorf("dry-run WorktreeAddNew returned error: %v", err)
 	}
 

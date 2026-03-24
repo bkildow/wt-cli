@@ -158,7 +158,8 @@ func runClaudeHookWorktreeCreate(cmd *cobra.Command, _ []string) error {
 			return fmt.Errorf("worktree add failed: %w", err)
 		}
 	} else {
-		if err := runner.WorktreeAddNew(ctx, worktreePath, branch); err != nil {
+		startPoint := runner.ResolveStartPoint(ctx, cfg.MainBranchOrDefault())
+		if err := runner.WorktreeAddNew(ctx, worktreePath, branch, startPoint); err != nil {
 			return fmt.Errorf("worktree add (new branch) failed: %w", err)
 		}
 	}

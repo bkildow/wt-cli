@@ -34,10 +34,7 @@ func runPrune(cmd *cobra.Command, args []string) error {
 	cwd, _ := os.Getwd()
 	runner := git.NewRunner(project.GitDirPath(projectRoot, cfg), IsDryRun())
 
-	defaultBranch, err := runner.GetDefaultBranch(ctx)
-	if err != nil {
-		return err
-	}
+	defaultBranch := cfg.MainBranchOrDefault()
 
 	worktrees, err := runner.WorktreeList(ctx)
 	if err != nil {

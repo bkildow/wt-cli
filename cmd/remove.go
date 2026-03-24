@@ -79,6 +79,11 @@ func runRemove(cmd *cobra.Command, args []string) error {
 		}
 	}
 
+	// Protect the main branch from accidental removal.
+	if selected.Branch == cfg.MainBranchOrDefault() {
+		return fmt.Errorf("cannot remove the main branch worktree (%s)", selected.Branch)
+	}
+
 	force, _ := cmd.Flags().GetBool("force")
 
 	if !force {

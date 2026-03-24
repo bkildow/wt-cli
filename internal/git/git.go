@@ -28,7 +28,7 @@ type Git interface {
 	ListRemoteBranches(ctx context.Context) ([]string, error)
 	HasRemoteBranch(ctx context.Context, branch string) (bool, error)
 	WorktreeAdd(ctx context.Context, path, branch string) error
-	WorktreeAddNew(ctx context.Context, path, branch string) error
+	WorktreeAddNew(ctx context.Context, path, branch, baseBranch string) error
 	WorktreeRemove(ctx context.Context, path string, force bool) error
 	WorktreeList(ctx context.Context) ([]WorktreeInfo, error)
 	WorktreePrune(ctx context.Context) error
@@ -155,8 +155,8 @@ func (r *Runner) WorktreeAdd(ctx context.Context, path, branch string) error {
 	return err
 }
 
-func (r *Runner) WorktreeAddNew(ctx context.Context, path, branch string) error {
-	_, err := r.Run(ctx, "worktree", "add", "--relative-paths", "-b", branch, path, "HEAD")
+func (r *Runner) WorktreeAddNew(ctx context.Context, path, branch, baseBranch string) error {
+	_, err := r.Run(ctx, "worktree", "add", "--relative-paths", "-b", branch, path, baseBranch)
 	return err
 }
 
@@ -296,6 +296,19 @@ func (r *Runner) GetDefaultBranch(ctx context.Context) (string, error) {
 	}
 
 	return "", fmt.Errorf("could not determine default branch")
+}
+
+// ResolveStartPoint finds a valid git ref for the given branch name.
+// It tries origin/<branch> first (for bare repos), then the local branch,
+// and falls back to HEAD if neither exists.
+func (r *Runner) ResolveStartPoint(ctx context.Context, branch string) string {
+	if _, err := r.Run(ctx, "rev-parse", "--verify", "origin/"+branch); err == nil {
+		return "origin/" + branch
+	}
+	if _, err := r.Run(ctx, "rev-parse", "--verify", branch); err == nil {
+		return branch
+	}
+	return "HEAD"
 }
 
 func (r *Runner) WorktreePrune(ctx context.Context) error {
