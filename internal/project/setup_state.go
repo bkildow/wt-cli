@@ -5,7 +5,6 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
-	"syscall"
 	"time"
 )
 
@@ -83,14 +82,6 @@ func ReadSetupState(worktreePath string) (*SetupState, error) {
 		return nil, err
 	}
 	return &state, nil
-}
-
-// IsProcessAlive checks whether a process with the given PID is still running.
-func IsProcessAlive(pid int) bool {
-	if pid <= 0 {
-		return false
-	}
-	return syscall.Kill(pid, 0) == nil
 }
 
 // ResolveSetupStatus reads the setup state and resolves stale processes.

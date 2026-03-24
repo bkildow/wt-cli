@@ -6,7 +6,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"syscall"
 	"time"
 
 	"github.com/bkildow/wt-cli/internal/config"
@@ -220,7 +219,7 @@ func runSetupBackground(projectRoot, worktreePath string, cfg *config.Config, dr
 		"--worktree-path", worktreePath,
 		"--project-root", projectRoot,
 	)
-	child.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
+	detachProcess(child)
 
 	// Redirect child's stdio to /dev/null so it doesn't inherit the parent's
 	// pipe file descriptors. Without this, Claude Code hooks hang because the
