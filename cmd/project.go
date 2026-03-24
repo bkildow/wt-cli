@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"errors"
 	"os"
 	"path/filepath"
@@ -61,6 +62,17 @@ func filterManagedWorktrees(worktrees []git.WorktreeInfo, projectRoot string) []
 		filtered = append(filtered, wt)
 	}
 	return filtered
+}
+
+// detectDefaultBranch asks git for the remote's default branch and falls back
+// to config.DefaultMainBranch on error.
+func detectDefaultBranch(ctx context.Context, runner git.Git) string {
+	branch, err := runner.GetDefaultBranch(ctx)
+	if err != nil {
+		ui.Warning("Could not detect default branch, defaulting to 'main'")
+		return config.DefaultMainBranch
+	}
+	return branch
 }
 
 // resolvePathBest tries to resolve symlinks; falls back to filepath.Clean.
