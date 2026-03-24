@@ -72,17 +72,9 @@ func runClone(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	// Detect the remote's default branch
-	ui.Step("Detecting default branch")
-	detectedBranch, err := runner.GetDefaultBranch(ctx)
-	if err != nil {
-		ui.Warning("Could not detect default branch, defaulting to 'main'")
-		detectedBranch = config.DefaultMainBranch
-	}
-
 	// Create scaffold directories
 	cfg := config.DefaultConfig()
-	cfg.MainBranch = detectedBranch
+	cfg.MainBranch = detectDefaultBranch(ctx, runner)
 	ui.Step("Creating project scaffold")
 	if err := project.CreateScaffold(projectRoot, &cfg, dry); err != nil {
 		return err

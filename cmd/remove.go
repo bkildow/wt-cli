@@ -40,6 +40,7 @@ func runRemove(cmd *cobra.Command, args []string) error {
 	}
 
 	filtered := filterManagedWorktrees(worktrees, projectRoot)
+	mainBranch := cfg.MainBranchOrDefault()
 
 	if len(filtered) == 0 {
 		return fmt.Errorf("no worktrees found")
@@ -47,6 +48,9 @@ func runRemove(cmd *cobra.Command, args []string) error {
 
 	var selected git.WorktreeInfo
 	if len(args) > 0 {
+		if args[0] == mainBranch {
+			return fmt.Errorf("cannot remove the main branch worktree (%s)", mainBranch)
+		}
 		found := false
 		for _, wt := range filtered {
 			if wt.Branch == args[0] {
@@ -59,8 +63,18 @@ func runRemove(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("worktree not found: %s", args[0])
 		}
 	} else {
-		names := make([]string, len(filtered))
-		for i, wt := range filtered {
+		// Exclude the main branch from the interactive picker.
+		var removable []git.WorktreeInfo
+		for _, wt := range filtered {
+			if wt.Branch != mainBranch {
+				removable = append(removable, wt)
+			}
+		}
+		if len(removable) == 0 {
+			return fmt.Errorf("no removable worktrees found (only the main branch exists)")
+		}
+		names := make([]string, len(removable))
+		for i, wt := range removable {
 			names[i] = wt.Branch
 		}
 		prompter := &ui.InteractivePrompter{}
@@ -71,17 +85,12 @@ func runRemove(cmd *cobra.Command, args []string) error {
 			}
 			return err
 		}
-		for _, wt := range filtered {
+		for _, wt := range removable {
 			if wt.Branch == name {
 				selected = wt
 				break
 			}
 		}
-	}
-
-	// Protect the main branch from accidental removal.
-	if selected.Branch == cfg.MainBranchOrDefault() {
-		return fmt.Errorf("cannot remove the main branch worktree (%s)", selected.Branch)
 	}
 
 	force, _ := cmd.Flags().GetBool("force")
