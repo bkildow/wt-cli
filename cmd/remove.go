@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"syscall"
 	"time"
 
 	"github.com/bkildow/wt-cli/internal/git"
@@ -128,12 +127,12 @@ func terminateBackgroundSetup(worktreePath, branch string) {
 	if err != nil || state == nil {
 		return
 	}
-	if state.Status != project.SetupRunning || !project.IsProcessAlive(state.PID) {
+	if state.Status != project.SetupRunning {
 		return
 	}
 
 	ui.Warning(fmt.Sprintf("Terminating in-progress setup for %s (PID %d)", branch, state.PID))
-	_ = syscall.Kill(state.PID, syscall.SIGTERM)
+	_ = terminateProcess(state.PID)
 
 	// Poll for exit, then force-kill if the process doesn't terminate.
 	deadline := time.After(2 * time.Second)
@@ -147,7 +146,7 @@ func terminateBackgroundSetup(worktreePath, branch string) {
 			}
 		case <-deadline:
 			if project.IsProcessAlive(state.PID) {
-				_ = syscall.Kill(state.PID, syscall.SIGKILL)
+				_ = killProcess(state.PID)
 			}
 			return
 		}
