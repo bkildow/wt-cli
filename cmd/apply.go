@@ -62,38 +62,12 @@ func runApply(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	var selected git.WorktreeInfo
-	if len(args) > 0 {
-		found := false
-		for _, wt := range filtered {
-			if wt.Branch == args[0] {
-				selected = wt
-				found = true
-				break
-			}
+	selected, err := selectWorktree(args, filtered)
+	if err != nil {
+		if ui.IsUserAbort(err) {
+			return nil
 		}
-		if !found {
-			return fmt.Errorf("worktree not found: %s", args[0])
-		}
-	} else {
-		names := make([]string, len(filtered))
-		for i, wt := range filtered {
-			names[i] = wt.Branch
-		}
-		prompter := &ui.InteractivePrompter{}
-		name, err := prompter.SelectWorktree(names)
-		if err != nil {
-			if ui.IsUserAbort(err) {
-				return nil
-			}
-			return err
-		}
-		for _, wt := range filtered {
-			if wt.Branch == name {
-				selected = wt
-				break
-			}
-		}
+		return err
 	}
 
 	vars := project.NewTemplateVars(projectRoot, selected.Path, selected.Branch)

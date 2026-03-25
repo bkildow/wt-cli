@@ -3,14 +3,18 @@ package cmd
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/bkildow/wt-cli/internal/config"
 	"github.com/bkildow/wt-cli/internal/git"
 	"github.com/bkildow/wt-cli/internal/project"
 	"github.com/bkildow/wt-cli/internal/ui"
 )
+
+const dotAlias = "."
 
 // findProjectRoot resolves the current directory and walks up to find the project root.
 // Prints a friendly error if no project is found.
@@ -81,4 +85,71 @@ func resolvePathBest(p string) string {
 		return resolved
 	}
 	return filepath.Clean(p)
+}
+
+// resolveCurrentWorktree finds the managed worktree that contains the current
+// working directory. Returns the matching WorktreeInfo and true, or a zero
+// value and false if the cwd is not inside any managed worktree.
+func resolveCurrentWorktree(filtered []git.WorktreeInfo) (git.WorktreeInfo, bool) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return git.WorktreeInfo{}, false
+	}
+	currentPath := resolvePathBest(cwd)
+	for _, wt := range filtered {
+		wtPath := resolvePathBest(wt.Path)
+		if currentPath == wtPath || strings.HasPrefix(currentPath, wtPath+string(os.PathSeparator)) {
+			return wt, true
+		}
+	}
+	return git.WorktreeInfo{}, false
+}
+
+// isInsideWorktree reports whether the current working directory is inside
+// the given worktree path (at the root or in a subdirectory).
+func isInsideWorktree(wt git.WorktreeInfo) bool {
+	_, ok := resolveCurrentWorktree([]git.WorktreeInfo{wt})
+	return ok
+}
+
+// findWorktreeByBranch looks up a worktree by branch name in the given list.
+func findWorktreeByBranch(filtered []git.WorktreeInfo, branch string) (git.WorktreeInfo, bool) {
+	for _, wt := range filtered {
+		if wt.Branch == branch {
+			return wt, true
+		}
+	}
+	return git.WorktreeInfo{}, false
+}
+
+// selectWorktree resolves a worktree from command args: "." for the current
+// worktree, a branch name for an exact match, or an interactive prompt when
+// no argument is provided.
+func selectWorktree(args []string, filtered []git.WorktreeInfo) (git.WorktreeInfo, error) {
+	switch {
+	case len(args) > 0 && args[0] == dotAlias:
+		wt, ok := resolveCurrentWorktree(filtered)
+		if !ok {
+			return git.WorktreeInfo{}, fmt.Errorf("not inside a managed worktree (use 'wt list' to see available worktrees)")
+		}
+		return wt, nil
+	case len(args) > 0:
+		wt, ok := findWorktreeByBranch(filtered, args[0])
+		if !ok {
+			return git.WorktreeInfo{}, fmt.Errorf("worktree not found: %s", args[0])
+		}
+		return wt, nil
+	default:
+		names := make([]string, len(filtered))
+		for i, wt := range filtered {
+			names[i] = wt.Branch
+		}
+		prompter := &ui.InteractivePrompter{}
+		name, err := prompter.SelectWorktree(names)
+		if err != nil {
+			return git.WorktreeInfo{}, err
+		}
+		wt, _ := findWorktreeByBranch(filtered, name)
+		return wt, nil
+	}
 }
