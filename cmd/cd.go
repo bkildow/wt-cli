@@ -15,7 +15,7 @@ func newCdCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:               "cd [name]",
 		Short:             "Print worktree path for shell navigation",
-		Long:              "Prints the absolute path of a worktree. Use with: cd \"$(wt cd)\"\n\nUse \"wt cd ..\" to navigate to the project root (same as \"wt root\").",
+		Long:              "Prints the absolute path of a worktree. Use with: cd \"$(wt cd)\"\n\nUse \"wt cd .\" to print the path of the current worktree.\nUse \"wt cd ..\" to navigate to the project root (same as \"wt root\").",
 		Args:              cobra.MaximumNArgs(1),
 		ValidArgsFunction: completeWorktreeNames,
 		RunE:              runCd,
@@ -47,35 +47,19 @@ func runCd(cmd *cobra.Command, args []string) error {
 	}
 
 	filtered := filterManagedWorktrees(worktrees, projectRoot)
-	names := make([]string, len(filtered))
-	for i, wt := range filtered {
-		names[i] = wt.Branch
-	}
 
 	if len(filtered) == 0 {
 		return fmt.Errorf("no worktrees found")
 	}
 
-	var selected string
-	if len(args) > 0 {
-		selected = args[0]
-	} else {
-		prompter := &ui.InteractivePrompter{}
-		selected, err = prompter.SelectWorktree(names)
-		if err != nil {
-			if ui.IsUserAbort(err) {
-				return nil
-			}
-			return err
-		}
-	}
-
-	for _, wt := range filtered {
-		if wt.Branch == selected {
-			fmt.Println(wt.Path)
+	selected, err := selectWorktree(args, filtered)
+	if err != nil {
+		if ui.IsUserAbort(err) {
 			return nil
 		}
+		return err
 	}
 
-	return fmt.Errorf("worktree not found: %s", selected)
+	fmt.Println(selected.Path)
+	return nil
 }

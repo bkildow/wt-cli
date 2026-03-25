@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/bkildow/wt-cli/internal/git"
@@ -45,37 +46,21 @@ func runRemove(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("no worktrees found")
 	}
 
-	var selected git.WorktreeInfo
-	if len(args) > 0 {
-		found := false
-		for _, wt := range filtered {
-			if wt.Branch == args[0] {
-				selected = wt
-				found = true
-				break
-			}
+	selected, err := selectWorktree(args, filtered)
+	if err != nil {
+		if ui.IsUserAbort(err) {
+			return nil
 		}
-		if !found {
-			return fmt.Errorf("worktree not found: %s", args[0])
-		}
-	} else {
-		names := make([]string, len(filtered))
-		for i, wt := range filtered {
-			names[i] = wt.Branch
-		}
-		prompter := &ui.InteractivePrompter{}
-		name, err := prompter.SelectWorktree(names)
-		if err != nil {
-			if ui.IsUserAbort(err) {
-				return nil
-			}
-			return err
-		}
-		for _, wt := range filtered {
-			if wt.Branch == name {
-				selected = wt
-				break
-			}
+		return err
+	}
+
+	// If the user's shell is inside the target worktree, move the process
+	// out so git can delete the directory. Track this so we can print the
+	// project root to stdout for the shell wrapper to cd to.
+	wasInside := isInsideWorktree(selected)
+	if wasInside {
+		if err := os.Chdir(projectRoot); err != nil {
+			return fmt.Errorf("could not change directory to project root: %w", err)
 		}
 	}
 
@@ -123,6 +108,12 @@ func runRemove(cmd *cobra.Command, args []string) error {
 	}
 
 	ui.Success("Removed worktree: " + selected.Branch)
+
+	// Print project root to stdout so the shell wrapper can cd the user there.
+	if wasInside {
+		fmt.Println(projectRoot)
+	}
+
 	return nil
 }
 

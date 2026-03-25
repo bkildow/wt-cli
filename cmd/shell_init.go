@@ -8,7 +8,7 @@ import (
 )
 
 const bashFunction = `wt() {
-  if [ "$1" = "cd" ] || [ "$1" = "add" ] || [ "$1" = "root" ]; then
+  if [ "$1" = "cd" ] || [ "$1" = "add" ] || [ "$1" = "root" ] || [ "$1" = "remove" ]; then
     local dir
     dir="$(command wt "$@")"
     if [ -n "$dir" ]; then
@@ -22,7 +22,7 @@ const bashFunction = `wt() {
 
 const zshFunction = `unalias wt 2>/dev/null
 eval 'wt() {
-  if [ "$1" = "cd" ] || [ "$1" = "add" ] || [ "$1" = "root" ]; then
+  if [ "$1" = "cd" ] || [ "$1" = "add" ] || [ "$1" = "root" ] || [ "$1" = "remove" ]; then
     local dir
     dir="$(command wt "$@")"
     if [ -n "$dir" ]; then
@@ -35,7 +35,7 @@ eval 'wt() {
 `
 
 const fishFunction = `function wt
-  if test "$argv[1]" = "cd" -o "$argv[1]" = "add" -o "$argv[1]" = "root"
+  if test "$argv[1]" = "cd" -o "$argv[1]" = "add" -o "$argv[1]" = "root" -o "$argv[1]" = "remove"
     set -l dir (command wt $argv)
     if test -n "$dir"
       cd "$dir"
