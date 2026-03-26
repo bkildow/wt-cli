@@ -1,6 +1,19 @@
-# wt
+<div align="center">
+  <img src="wt-cli.webp" alt="wt CLI - git worktree workflow manager" width="600">
 
-A CLI for managing git worktree-based development workflows. Clone once as a bare repo, then spin up isolated worktrees per branch with shared config files, symlinks, and template variables.
+  <br>
+
+  <p>A CLI for managing git worktree-based development workflows.<br>
+  Clone once as a bare repo, then spin up isolated worktrees per branch with shared config files, symlinks, and template variables.</p>
+
+  <p>
+    <a href="https://github.com/bkildow/wt-cli/releases/latest"><img src="https://img.shields.io/github/v/release/bkildow/wt-cli" alt="Latest Release"></a>
+    <a href="https://github.com/bkildow/wt-cli/blob/main/LICENSE"><img src="https://img.shields.io/github/license/bkildow/wt-cli" alt="License"></a>
+    <a href="https://github.com/bkildow/wt-cli"><img src="https://img.shields.io/github/go-mod/go-version/bkildow/wt-cli" alt="Go Version"></a>
+  </p>
+</div>
+
+---
 
 ## Features
 
