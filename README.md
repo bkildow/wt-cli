@@ -1,6 +1,8 @@
 <div align="center">
   <img src="wt-cli.webp" alt="wt CLI - git worktree workflow manager" width="600">
 
+  <br>
+
   <p>A CLI for managing git worktree-based development workflows.<br>
   Clone once as a bare repo, then spin up isolated worktrees per branch with shared config files, symlinks, and template variables.</p>
 
