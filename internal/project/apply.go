@@ -2,13 +2,13 @@ package project
 
 import (
 	"fmt"
-	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/bkildow/wt-cli/internal/config"
+	"github.com/bkildow/wt-cli/internal/project/fscopy"
 	"github.com/bkildow/wt-cli/internal/ui"
 )
 
@@ -80,7 +80,7 @@ func ApplyCopy(projectRoot, worktreePath string, cfg *config.Config, dryRun bool
 			return os.WriteFile(dest, []byte(processed), srcInfo.Mode())
 		}
 
-		if err := copyFile(path, dest); err != nil {
+		if err := fscopy.CopyFile(path, dest); err != nil {
 			return err
 		}
 		if isNested {
@@ -219,26 +219,4 @@ func logCopyDir(name string, logged map[string]bool, dryRun bool) {
 		ui.Info(fmt.Sprintf("  copied %s/", name))
 	}
 	logged[name] = true
-}
-
-func copyFile(src, dst string) error {
-	srcInfo, err := os.Stat(src)
-	if err != nil {
-		return err
-	}
-
-	in, err := os.Open(src)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = in.Close() }()
-
-	out, err := os.OpenFile(dst, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, srcInfo.Mode())
-	if err != nil {
-		return err
-	}
-	defer func() { _ = out.Close() }()
-
-	_, err = io.Copy(out, in)
-	return err
 }
