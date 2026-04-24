@@ -29,23 +29,34 @@ func ApplyCopy(projectRoot, worktreePath string, cfg *config.Config, dryRun bool
 
 	var count int
 	logged := make(map[string]bool)
+
+	// Fast path: reflink whole template-free subtrees in one syscall instead of walking file-by-file.
+	skipTrees, treeCount, err := fastPathCopyTrees(copyDir, worktreePath, vars, dryRun, logged)
+	if err != nil {
+		return 0, err
+	}
+	count += treeCount
+
 	sep := string(filepath.Separator)
-	err := filepath.WalkDir(copyDir, func(path string, d fs.DirEntry, err error) error {
+	err = filepath.WalkDir(copyDir, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
-		if d.IsDir() {
+		if path == copyDir {
 			return nil
 		}
-
 		rel, err := filepath.Rel(copyDir, path)
 		if err != nil {
 			return err
 		}
-		dest := filepath.Join(worktreePath, rel)
-
-		// Determine the top-level entry for collapsed logging.
 		topLevel, _, isNested := strings.Cut(rel, sep)
+		if d.IsDir() {
+			if skipTrees[topLevel] {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		dest := filepath.Join(worktreePath, rel)
 
 		if dryRun {
 			if isNested {
@@ -92,6 +103,84 @@ func ApplyCopy(projectRoot, worktreePath string, cfg *config.Config, dryRun bool
 		return nil
 	})
 	return count, err
+}
+
+// fastPathCopyTrees reflinks each template-free top-level subtree and returns the
+// names the caller's per-file walk should skip, plus the file count for reporting.
+func fastPathCopyTrees(copyDir, worktreePath string, vars *TemplateVars, dryRun bool, logged map[string]bool) (skip map[string]bool, totalFiles int, err error) {
+	skip = make(map[string]bool)
+
+	entries, err := os.ReadDir(copyDir)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	wantTemplateScan := vars != nil
+
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+
+		subSrc := filepath.Join(copyDir, entry.Name())
+		subDst := filepath.Join(worktreePath, entry.Name())
+
+		hasTemplate, fileCount, scanErr := scanTreeForTemplates(subSrc, wantTemplateScan)
+		if scanErr != nil {
+			return skip, totalFiles, scanErr
+		}
+		if hasTemplate {
+			continue
+		}
+
+		if dryRun {
+			logCopyDir(entry.Name(), logged, true)
+			skip[entry.Name()] = true
+			totalFiles += fileCount
+			continue
+		}
+
+		// CopyTree requires a fresh dst; if one already exists, let the per-file walk overwrite it.
+		if _, lstatErr := os.Lstat(subDst); lstatErr == nil {
+			continue
+		}
+
+		if cloneErr := fscopy.CopyTree(subSrc, subDst); cloneErr != nil {
+			if fscopy.IsReflinkUnsupported(cloneErr) {
+				continue
+			}
+			return skip, totalFiles, cloneErr
+		}
+		logCopyDir(entry.Name(), logged, false)
+		skip[entry.Name()] = true
+		totalFiles += fileCount
+	}
+
+	return skip, totalFiles, nil
+}
+
+func scanTreeForTemplates(dir string, wantTemplateScan bool) (hasTemplate bool, fileCount int, err error) {
+	err = filepath.WalkDir(dir, func(_ string, d fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if d.IsDir() {
+			return nil
+		}
+		if wantTemplateScan && IsTemplateFile(d.Name()) {
+			hasTemplate = true
+			return filepath.SkipAll
+		}
+		fileCount++
+		return nil
+	})
+	if err != nil {
+		return false, 0, err
+	}
+	if hasTemplate {
+		return true, 0, nil
+	}
+	return false, fileCount, nil
 }
 
 // ApplySymlinks creates symlinks in the worktree for each top-level entry

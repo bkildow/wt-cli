@@ -45,6 +45,13 @@ func tryReflink(src, dst string) error {
 	return nil
 }
 
+// tryCloneTree is not supported on Linux: FICLONE is file-only and there
+// is no tree-level reflink syscall on btrfs/XFS. Callers fall back to a
+// per-file walk.
+func tryCloneTree(_, _ string) error {
+	return errReflinkUnsupported
+}
+
 func isUnsupported(err error) bool {
 	var errno unix.Errno
 	if !errors.As(err, &errno) {
