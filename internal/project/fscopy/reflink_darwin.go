@@ -23,6 +23,12 @@ func tryReflink(src, dst string) error {
 	return err
 }
 
+// tryCloneTree clones a directory via clonefile(2), which walks the
+// whole hierarchy in one syscall on APFS.
+func tryCloneTree(src, dst string) error {
+	return tryReflink(src, dst)
+}
+
 // isUnsupported reports whether err from Clonefile indicates that the
 // call cannot succeed on this source/destination pair for reasons that
 // are recoverable by falling back to a byte copy (wrong filesystem,

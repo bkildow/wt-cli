@@ -3,8 +3,10 @@ package fscopy
 import (
 	"bytes"
 	"crypto/rand"
+	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -180,6 +182,140 @@ func TestByteCopyRefusesExistingDst(t *testing.T) {
 	}
 	if err := byteCopy(src, dst, 0o644); err == nil {
 		t.Fatal("expected O_EXCL error when dst exists")
+	}
+}
+
+// skipUnlessReflinkTree skips the test when tryCloneTree reports the
+// current filesystem cannot clone trees. On macOS t.TempDir is APFS so
+// this runs; on Linux / non-APFS it returns errReflinkUnsupported.
+func skipUnlessReflinkTree(t *testing.T) {
+	t.Helper()
+	if runtime.GOOS != "darwin" {
+		t.Skip("tree-level reflink only implemented on darwin")
+	}
+	// Probe: try cloning an empty dir. If unsupported on the test FS, skip.
+	probeSrc := filepath.Join(t.TempDir(), "probe-src")
+	if err := os.Mkdir(probeSrc, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	probeDst := filepath.Join(t.TempDir(), "probe-dst")
+	if err := CopyTree(probeSrc, probeDst); err != nil {
+		if errors.Is(err, errReflinkUnsupported) {
+			t.Skipf("tree reflink unsupported on this filesystem: %v", err)
+		}
+		t.Fatalf("probe CopyTree: %v", err)
+	}
+}
+
+func TestCopyTreeNested(t *testing.T) {
+	skipUnlessReflinkTree(t)
+	srcRoot := t.TempDir()
+	dstRoot := t.TempDir()
+	src := filepath.Join(srcRoot, "tree")
+	dst := filepath.Join(dstRoot, "tree")
+
+	if err := os.MkdirAll(filepath.Join(src, "a", "b"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(src, "a", "top.txt"), []byte("top"), 0o640); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(src, "a", "b", "deep.txt"), []byte("deep"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := CopyTree(src, dst); err != nil {
+		t.Fatalf("CopyTree: %v", err)
+	}
+
+	got, err := os.ReadFile(filepath.Join(dst, "a", "top.txt"))
+	if err != nil || string(got) != "top" {
+		t.Errorf("top.txt = %q err %v; want %q", got, err, "top")
+	}
+	info, err := os.Stat(filepath.Join(dst, "a", "top.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Mode().Perm() != 0o640 {
+		t.Errorf("top.txt mode = %v, want 0o640", info.Mode().Perm())
+	}
+
+	got, err = os.ReadFile(filepath.Join(dst, "a", "b", "deep.txt"))
+	if err != nil || string(got) != "deep" {
+		t.Errorf("deep.txt = %q err %v; want %q", got, err, "deep")
+	}
+
+	if _, err := os.Stat(dst + ".wtclone"); err == nil {
+		t.Error("tree .wtclone was not cleaned up")
+	}
+}
+
+func TestCopyTreePreservesSymlink(t *testing.T) {
+	skipUnlessReflinkTree(t)
+	srcRoot := t.TempDir()
+	dstRoot := t.TempDir()
+	src := filepath.Join(srcRoot, "tree")
+	dst := filepath.Join(dstRoot, "tree")
+
+	if err := os.MkdirAll(src, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(src, "real.txt"), []byte("r"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink("real.txt", filepath.Join(src, "link.txt")); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := CopyTree(src, dst); err != nil {
+		t.Fatalf("CopyTree: %v", err)
+	}
+
+	info, err := os.Lstat(filepath.Join(dst, "link.txt"))
+	if err != nil {
+		t.Fatalf("lstat link: %v", err)
+	}
+	if info.Mode()&os.ModeSymlink == 0 {
+		t.Error("link.txt was not preserved as a symlink")
+	}
+	target, err := os.Readlink(filepath.Join(dst, "link.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if target != "real.txt" {
+		t.Errorf("symlink target = %q, want %q", target, "real.txt")
+	}
+}
+
+func TestCopyTreeExistingDst(t *testing.T) {
+	skipUnlessReflinkTree(t)
+	srcRoot := t.TempDir()
+	dstRoot := t.TempDir()
+	src := filepath.Join(srcRoot, "tree")
+	dst := filepath.Join(dstRoot, "tree")
+
+	if err := os.MkdirAll(src, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(dst, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	err := CopyTree(src, dst)
+	if err == nil {
+		t.Fatal("expected error when dst already exists")
+	}
+	if errors.Is(err, errReflinkUnsupported) {
+		t.Errorf("existing-dst should not map to unsupported: %v", err)
+	}
+}
+
+func TestIsReflinkUnsupported(t *testing.T) {
+	if !IsReflinkUnsupported(errReflinkUnsupported) {
+		t.Error("IsReflinkUnsupported should return true for sentinel")
+	}
+	if IsReflinkUnsupported(errors.New("something else")) {
+		t.Error("IsReflinkUnsupported should return false for arbitrary error")
 	}
 }
 

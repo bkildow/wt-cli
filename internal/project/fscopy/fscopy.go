@@ -67,6 +67,39 @@ func CopyFile(src, dst string) error {
 	return nil
 }
 
+// CopyTree clones a directory in one filesystem reflink syscall, writing via
+// "<dst>.wtclone" + atomic rename. Returns an error for which IsReflinkUnsupported
+// is true when the FS can't clone trees; callers fall back to a per-file walk.
+func CopyTree(src, dst string) error {
+	if _, err := os.Stat(src); err != nil {
+		return err
+	}
+
+	tmp := dst + ".wtclone"
+	_ = os.RemoveAll(tmp)
+
+	if err := tryCloneTree(src, tmp); err != nil {
+		if errors.Is(err, errReflinkUnsupported) {
+			return err
+		}
+		_ = os.RemoveAll(tmp)
+		return fmt.Errorf("fscopy: clone tree %s -> %s: %w", src, dst, err)
+	}
+
+	if err := os.Rename(tmp, dst); err != nil {
+		_ = os.RemoveAll(tmp)
+		return err
+	}
+	return nil
+}
+
+// IsReflinkUnsupported reports whether err indicates the platform or
+// filesystem does not support reflink/tree-clone. Callers of CopyTree
+// use this to decide whether to fall back to a per-file walk.
+func IsReflinkUnsupported(err error) bool {
+	return errors.Is(err, errReflinkUnsupported)
+}
+
 // byteCopy performs the non-reflink fallback: a plain io.Copy preserving
 // the source mode. Matches the semantics of the previous private copyFile
 // in internal/project/apply.go so existing callers see no behavior change

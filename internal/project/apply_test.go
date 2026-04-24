@@ -69,6 +69,118 @@ func TestApplyCopyDryRun(t *testing.T) {
 	}
 }
 
+// TestApplyCopyFastPathForDirectories exercises the CopyTree fast path:
+// a top-level directory with no templates should be reflinked whole on
+// APFS and fall back to the per-file walk elsewhere. Either path must
+// produce a correct destination tree.
+func TestApplyCopyFastPathForDirectories(t *testing.T) {
+	root := t.TempDir()
+	wt := t.TempDir()
+
+	copyDir := filepath.Join(root, "shared", "copy")
+	treeDir := filepath.Join(copyDir, "vendor")
+	if err := os.MkdirAll(filepath.Join(treeDir, "pkg"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(treeDir, "a.txt"), []byte("a"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(treeDir, "pkg", "b.txt"), []byte("b"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := &config.Config{SharedDir: config.DefaultSharedDir}
+	count, err := ApplyCopy(root, wt, cfg, false, nil)
+	if err != nil {
+		t.Fatalf("ApplyCopy error: %v", err)
+	}
+	if count != 2 {
+		t.Errorf("count = %d, want 2", count)
+	}
+
+	got, err := os.ReadFile(filepath.Join(wt, "vendor", "a.txt"))
+	if err != nil || string(got) != "a" {
+		t.Errorf("vendor/a.txt = %q err %v; want %q", got, err, "a")
+	}
+	got, err = os.ReadFile(filepath.Join(wt, "vendor", "pkg", "b.txt"))
+	if err != nil || string(got) != "b" {
+		t.Errorf("vendor/pkg/b.txt = %q err %v; want %q", got, err, "b")
+	}
+}
+
+// TestApplyCopyFallsBackWhenTreeContainsTemplate confirms that a
+// subtree with a .template file takes the slow per-file path so that
+// ProcessTemplate runs.
+func TestApplyCopyFallsBackWhenTreeContainsTemplate(t *testing.T) {
+	root := t.TempDir()
+	wt := t.TempDir()
+
+	copyDir := filepath.Join(root, "shared", "copy")
+	treeDir := filepath.Join(copyDir, ".ddev")
+	if err := os.MkdirAll(treeDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(treeDir, "plain.txt"), []byte("plain"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(treeDir, "config.yaml.template"), []byte("branch: ${BRANCH_NAME}"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := &config.Config{SharedDir: config.DefaultSharedDir}
+	vars := &TemplateVars{BranchName: "feat/x"}
+	if _, err := ApplyCopy(root, wt, cfg, false, vars); err != nil {
+		t.Fatalf("ApplyCopy error: %v", err)
+	}
+
+	got, err := os.ReadFile(filepath.Join(wt, ".ddev", "plain.txt"))
+	if err != nil || string(got) != "plain" {
+		t.Errorf(".ddev/plain.txt = %q err %v; want %q", got, err, "plain")
+	}
+
+	// The template extension should be stripped and the variable substituted.
+	got, err = os.ReadFile(filepath.Join(wt, ".ddev", "config.yaml"))
+	if err != nil {
+		t.Fatalf(".ddev/config.yaml not produced: %v", err)
+	}
+	if string(got) != "branch: feat/x" {
+		t.Errorf("template output = %q, want %q", got, "branch: feat/x")
+	}
+	// The raw .template file must NOT appear at the destination.
+	if _, err := os.Stat(filepath.Join(wt, ".ddev", "config.yaml.template")); err == nil {
+		t.Error("raw .template file should not be copied when vars are provided")
+	}
+}
+
+// TestApplyCopyFastPathPreservedWhenVarsNil confirms that when vars is
+// nil, a .template file inside a subtree does NOT block the fast path
+// (no substitution would happen, so tree-level reflink is safe).
+func TestApplyCopyFastPathPreservedWhenVarsNil(t *testing.T) {
+	root := t.TempDir()
+	wt := t.TempDir()
+
+	copyDir := filepath.Join(root, "shared", "copy")
+	treeDir := filepath.Join(copyDir, "vendor")
+	if err := os.MkdirAll(treeDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(treeDir, "x.template"), []byte("${KEEP}"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := &config.Config{SharedDir: config.DefaultSharedDir}
+	if _, err := ApplyCopy(root, wt, cfg, false, nil); err != nil {
+		t.Fatalf("ApplyCopy error: %v", err)
+	}
+
+	// With vars=nil, the template should be copied as a regular file with its
+	// name intact (no substitution).
+	got, err := os.ReadFile(filepath.Join(wt, "vendor", "x.template"))
+	if err != nil || string(got) != "${KEEP}" {
+		t.Errorf("x.template = %q err %v; want raw bytes", got, err)
+	}
+}
+
 func TestApplyCopyMissingSharedDir(t *testing.T) {
 	root := t.TempDir()
 	wt := t.TempDir()
