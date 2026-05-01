@@ -76,6 +76,7 @@ wt prune
 | `wt add [branch]` | Create a new worktree for a branch |
 | `wt list` | List all worktrees |
 | `wt remove [name]` | Remove a worktree and its branch |
+| `wt setup [name]` | Run setup hooks on an existing worktree |
 | `wt cd [name]` | Print worktree path for shell navigation |
 | `wt root` | Print project root path for shell navigation |
 | `wt apply [name]` | Apply shared files to a worktree |
@@ -115,7 +116,7 @@ wt add                       # Interactive branch picker
 wt add feature/auth --skip-setup  # Create worktree without running setup hooks
 ```
 
-Detects whether the branch exists remotely or creates a new local branch. Applies shared files and runs setup hooks. If setup hooks fail, the worktree is still created and you are CDed into it.
+Detects whether the branch exists remotely or creates a new local branch. Applies shared files and runs setup hooks. If setup hooks fail, the worktree is still created and you are CDed into it. Use `wt setup [name]` later to bootstrap a worktree created with `--skip-setup`.
 
 ### wt remove
 
@@ -126,6 +127,21 @@ wt remove feature/auth --skip-teardown  # Remove without running teardown hooks
 ```
 
 Runs teardown hooks before removing the worktree directory.
+
+### wt setup
+
+```bash
+wt setup feature/auth        # Run setup hooks on an existing worktree
+wt setup .                   # Target the worktree containing $PWD
+wt setup                     # Interactive picker
+wt setup --background        # Run hooks in the background
+```
+
+Re-runs the `setup:` and `parallel_setup:` hooks from `.worktree.yml` against an
+existing worktree. The primary use case is bootstrapping a worktree that was
+created with `wt add --skip-setup`, but it can also be used to re-run hooks
+after editing `.worktree.yml`. Refuses to run when a setup is already in
+progress for the target worktree (check with `wt status`).
 
 ### wt cd
 

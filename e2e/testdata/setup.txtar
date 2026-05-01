@@ -1,0 +1,52 @@
+[!exec:git] skip 'git not available'
+
+setup-repo develop
+setup-project
+
+cd $WORK/project
+
+cp $WORK/with-hooks.yml .worktree.yml
+
+exec wt add --skip-setup main
+exists worktrees/main
+grep '"status": "skipped"' worktrees/main/.wt-setup.json
+! exists worktrees/main/setup-marker
+
+exec wt setup main
+exists worktrees/main/setup-marker
+grep '"status": "complete"' worktrees/main/.wt-setup.json
+
+# Dot alias resolves to the worktree containing $PWD.
+rm worktrees/main/setup-marker
+cd $WORK/project/worktrees/main
+exec wt setup .
+exists $WORK/project/worktrees/main/setup-marker
+cd $WORK/project
+
+# e2e wt shim drops error messages, so we only check exit code.
+! exec wt setup nonexistent
+
+rm worktrees/main/setup-marker
+exec wt setup --dry-run main
+! exists worktrees/main/setup-marker
+
+exec wt add --skip-setup develop
+cp $WORK/no-hooks.yml .worktree.yml
+exec wt setup develop
+stderr 'No setup hooks configured'
+
+exec wt setup --help
+stdout 'Run setup hooks'
+
+-- with-hooks.yml --
+version: 1
+git_dir: .bare
+worktree_dir: worktrees
+shared_dir: shared
+setup:
+  - touch setup-marker
+-- no-hooks.yml --
+version: 1
+git_dir: .bare
+worktree_dir: worktrees
+shared_dir: shared
