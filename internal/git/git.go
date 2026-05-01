@@ -361,13 +361,22 @@ func (r *Runner) GetLastCommitAge(ctx context.Context, worktreePath string) (str
 }
 
 func (r *Runner) GetBehindCount(ctx context.Context, worktreePath string) (int, error) {
-	args := []string{"-C", worktreePath, "rev-list", "--count", "HEAD..@{upstream}"}
-	cmdStr := "git " + strings.Join(args, " ")
+	checkArgs := []string{"-C", worktreePath, "rev-parse", "--verify", "--quiet", "@{upstream}"}
+	checkStr := "git " + strings.Join(checkArgs, " ")
 
 	if r.DryRun {
-		ui.DryRunNotice(cmdStr)
+		ui.DryRunNotice(checkStr)
+		ui.DryRunNotice("git -C " + worktreePath + " rev-list --count HEAD..@{upstream}")
 		return 0, nil
 	}
+
+	ui.Command(checkStr)
+	if err := exec.CommandContext(ctx, "git", checkArgs...).Run(); err != nil {
+		return 0, nil
+	}
+
+	args := []string{"-C", worktreePath, "rev-list", "--count", "HEAD..@{upstream}"}
+	cmdStr := "git " + strings.Join(args, " ")
 
 	ui.Command(cmdStr)
 	cmd := exec.CommandContext(ctx, "git", args...)
@@ -376,11 +385,7 @@ func (r *Runner) GetBehindCount(ctx context.Context, worktreePath string) (int, 
 	cmd.Stderr = &stderr
 
 	if err := cmd.Run(); err != nil {
-		stderrStr := stderr.String()
-		if strings.Contains(stderrStr, "no upstream") || strings.Contains(stderrStr, "unknown revision") {
-			return 0, nil
-		}
-		return 0, fmt.Errorf("%s: %w\n%s", cmdStr, err, stderrStr)
+		return 0, fmt.Errorf("%s: %w\n%s", cmdStr, err, stderr.String())
 	}
 
 	return parseBehindCount(stdout.String()), nil
