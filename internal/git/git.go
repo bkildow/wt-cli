@@ -25,6 +25,8 @@ type Git interface {
 	Run(ctx context.Context, args ...string) (string, error)
 	CloneBare(ctx context.Context, url, dest string) error
 	ConfigureRemoteFetch(ctx context.Context) error
+	EnableWorktreeConfig(ctx context.Context) error
+	SetWorktreeBareFalse(ctx context.Context, worktreePath string) error
 	Fetch(ctx context.Context, remote string) error
 	ListRemoteBranches(ctx context.Context) ([]string, error)
 	HasRemoteBranch(ctx context.Context, branch string) (bool, error)
@@ -49,6 +51,8 @@ type Runner struct {
 	GitDir    string
 	DryRun    bool
 	BatchMode bool // Suppress interactive prompts (for non-TTY environments like hooks)
+
+	worktreeConfigEnabled bool
 }
 
 func NewRunner(gitDir string, dryRun bool) *Runner {
@@ -114,6 +118,44 @@ func (r *Runner) ConfigureRemoteFetch(ctx context.Context) error {
 	return err
 }
 
+// EnableWorktreeConfig enables extensions.worktreeConfig on the common dir.
+// Idempotent and cached per Runner so repeated calls within one invocation
+// don't re-fork.
+func (r *Runner) EnableWorktreeConfig(ctx context.Context) error {
+	if r.worktreeConfigEnabled {
+		return nil
+	}
+	if _, err := r.Run(ctx, "config", "extensions.worktreeConfig", "true"); err != nil {
+		return err
+	}
+	r.worktreeConfigEnabled = true
+	return nil
+}
+
+// SetWorktreeBareFalse writes core.bare=false into the worktree's
+// config.worktree. Required on git 2.52+ for worktrees attached to a bare
+// common dir. Caller must have enabled extensions.worktreeConfig first.
+func (r *Runner) SetWorktreeBareFalse(ctx context.Context, worktreePath string) error {
+	args := []string{"-C", worktreePath, "config", "--worktree", "core.bare", "false"}
+	cmdStr := "git " + strings.Join(args, " ")
+
+	if r.DryRun {
+		ui.DryRunNotice(cmdStr)
+		return nil
+	}
+
+	ui.Command(cmdStr)
+	cmd := exec.CommandContext(ctx, "git", args...)
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("%s: %w\n%s", cmdStr, err, stderr.String())
+	}
+
+	return nil
+}
+
 func (r *Runner) Fetch(ctx context.Context, remote string) error {
 	_, err := r.Run(ctx, "fetch", remote)
 	return err
@@ -173,13 +215,23 @@ func (r *Runner) HasLocalBranch(ctx context.Context, branch string) (bool, error
 }
 
 func (r *Runner) WorktreeAdd(ctx context.Context, path, branch string) error {
-	_, err := r.Run(ctx, "worktree", "add", "--relative-paths", path, branch)
-	return err
+	if _, err := r.Run(ctx, "worktree", "add", "--relative-paths", path, branch); err != nil {
+		return err
+	}
+	if err := r.EnableWorktreeConfig(ctx); err != nil {
+		return err
+	}
+	return r.SetWorktreeBareFalse(ctx, path)
 }
 
 func (r *Runner) WorktreeAddNew(ctx context.Context, path, branch, baseBranch string) error {
-	_, err := r.Run(ctx, "worktree", "add", "--relative-paths", "-b", branch, path, baseBranch)
-	return err
+	if _, err := r.Run(ctx, "worktree", "add", "--relative-paths", "-b", branch, path, baseBranch); err != nil {
+		return err
+	}
+	if err := r.EnableWorktreeConfig(ctx); err != nil {
+		return err
+	}
+	return r.SetWorktreeBareFalse(ctx, path)
 }
 
 func (r *Runner) WorktreeRemove(ctx context.Context, path string, force bool) error {
