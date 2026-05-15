@@ -507,6 +507,37 @@ func TestIntegrationCloneAndWorktree(t *testing.T) {
 		t.Errorf(".git file should use relative path, got: %s", gitdirLine)
 	}
 
+	// Verify extensions.worktreeConfig is enabled on the bare common dir.
+	bareCfg, err := os.ReadFile(filepath.Join(bareDir, "config"))
+	if err != nil {
+		t.Fatalf("reading bare config: %v", err)
+	}
+	if !strings.Contains(string(bareCfg), "worktreeConfig = true") {
+		t.Errorf("bare config missing extensions.worktreeConfig = true:\n%s", bareCfg)
+	}
+
+	// Verify the worktree has its own config.worktree with core.bare = false.
+	gitdirRel := strings.TrimSpace(strings.TrimPrefix(gitdirLine, "gitdir:"))
+	worktreeGitDir := gitdirRel
+	if !filepath.IsAbs(worktreeGitDir) {
+		worktreeGitDir = filepath.Join(wtPath, worktreeGitDir)
+	}
+	wtCfg, err := os.ReadFile(filepath.Join(worktreeGitDir, "config.worktree"))
+	if err != nil {
+		t.Fatalf("reading worktree config.worktree: %v", err)
+	}
+	if !strings.Contains(string(wtCfg), "bare = false") {
+		t.Errorf("config.worktree missing core.bare = false:\n%s", wtCfg)
+	}
+
+	// Auto-discovery should work from inside the worktree (the regression we
+	// are guarding against on git 2.52+).
+	statusCmd := exec.Command("git", "status", "--porcelain")
+	statusCmd.Dir = wtPath
+	if out, err := statusCmd.CombinedOutput(); err != nil {
+		t.Errorf("git status inside worktree should succeed: %v\n%s", err, out)
+	}
+
 	// List worktrees
 	worktrees, err := runner.WorktreeList(ctx)
 	if err != nil {

@@ -66,6 +66,10 @@ func runClone(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	if err := runner.EnableWorktreeConfig(ctx); err != nil {
+		return err
+	}
+
 	// Fetch all branches
 	ui.Step("Fetching remote branches")
 	if err := runner.Fetch(ctx, "origin"); err != nil {
