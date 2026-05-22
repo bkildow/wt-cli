@@ -31,7 +31,8 @@
 ## Requirements
 
 - **Go 1.25+** (for building from source)
-- **Git 2.40+** (for relative worktree paths via `--relative-paths`)
+- **Git 2.20+** (for `extensions.worktreeConfig` and `git config --worktree`)
+  - Git 2.48+ additionally enables relative-path worktrees, making the project directory portable (move/rename without breaking `.git` pointers). On older git, worktrees still work — they just use absolute paths.
 
 ## Install
 

@@ -407,6 +407,82 @@ func TestParseBehindCount(t *testing.T) {
 	}
 }
 
+func TestParseGitVersion(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		expect  [3]int
+		wantErr bool
+	}{
+		{
+			name:   "standard",
+			input:  "git version 2.52.0\n",
+			expect: [3]int{2, 52, 0},
+		},
+		{
+			name:   "apple suffix",
+			input:  "git version 2.39.5 (Apple Git-154)\n",
+			expect: [3]int{2, 39, 5},
+		},
+		{
+			name:   "rc suffix",
+			input:  "git version 2.48.0.rc1\n",
+			expect: [3]int{2, 48, 0},
+		},
+		{
+			name:   "two-part version",
+			input:  "git version 2.47\n",
+			expect: [3]int{2, 47, 0},
+		},
+		{
+			name:    "missing version",
+			input:   "git version\n",
+			wantErr: true,
+		},
+		{
+			name:    "garbage",
+			input:   "not a git output",
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := parseGitVersion(tt.input)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("parseGitVersion(%q) err = %v, wantErr = %v", tt.input, err, tt.wantErr)
+			}
+			if !tt.wantErr && got != tt.expect {
+				t.Errorf("parseGitVersion(%q) = %v, want %v", tt.input, got, tt.expect)
+			}
+		})
+	}
+}
+
+func TestSupportsRelativePaths(t *testing.T) {
+	tests := []struct {
+		name   string
+		v      [3]int
+		expect bool
+	}{
+		{"2.47.9", [3]int{2, 47, 9}, false},
+		{"2.48.0", [3]int{2, 48, 0}, true},
+		{"2.48.5", [3]int{2, 48, 5}, true},
+		{"2.52.0", [3]int{2, 52, 0}, true},
+		{"3.0.0", [3]int{3, 0, 0}, true},
+		{"1.9.0", [3]int{1, 9, 0}, false},
+		{"zero", [3]int{0, 0, 0}, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := supportsRelativePaths(tt.v); got != tt.expect {
+				t.Errorf("supportsRelativePaths(%v) = %v, want %v", tt.v, got, tt.expect)
+			}
+		})
+	}
+}
+
 func TestIntegrationCloneAndWorktree(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test")

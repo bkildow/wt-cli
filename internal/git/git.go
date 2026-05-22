@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/bkildow/wt-cli/internal/ui"
 )
@@ -53,6 +54,10 @@ type Runner struct {
 	BatchMode bool // Suppress interactive prompts (for non-TTY environments like hooks)
 
 	worktreeConfigEnabled bool
+
+	versionOnce   sync.Once
+	versionParsed [3]int
+	versionErr    error
 }
 
 func NewRunner(gitDir string, dryRun bool) *Runner {
@@ -214,8 +219,74 @@ func (r *Runner) HasLocalBranch(ctx context.Context, branch string) (bool, error
 	return true, nil
 }
 
+// Version returns the local git version as [major, minor, patch].
+// The result is cached for the lifetime of the Runner so repeated calls
+// don't re-fork. The probe runs `git --version` directly (not through
+// r.Run) so it works before the bare repo exists, e.g. during `wt clone`.
+func (r *Runner) Version(ctx context.Context) ([3]int, error) {
+	r.versionOnce.Do(func() {
+		cmd := exec.CommandContext(ctx, "git", "--version")
+		var stdout, stderr bytes.Buffer
+		cmd.Stdout = &stdout
+		cmd.Stderr = &stderr
+		if err := cmd.Run(); err != nil {
+			r.versionErr = fmt.Errorf("git --version: %w\n%s", err, stderr.String())
+			return
+		}
+		r.versionParsed, r.versionErr = parseGitVersion(stdout.String())
+	})
+	return r.versionParsed, r.versionErr
+}
+
+// parseGitVersion extracts [major, minor, patch] from `git --version` output
+// like "git version 2.52.0", "git version 2.39.5 (Apple Git-154)", or
+// "git version 2.48.0.rc1". Trailing components beyond patch are ignored.
+func parseGitVersion(output string) ([3]int, error) {
+	s := strings.TrimSpace(output)
+	s = strings.TrimPrefix(s, "git version ")
+	// Split off anything after the first non-digit/non-dot rune.
+	end := len(s)
+	for i, c := range s {
+		if (c < '0' || c > '9') && c != '.' {
+			end = i
+			break
+		}
+	}
+	s = s[:end]
+	parts := strings.Split(s, ".")
+	if len(parts) < 2 {
+		return [3]int{}, fmt.Errorf("unrecognized git version output: %q", output)
+	}
+	var v [3]int
+	for i := 0; i < 3 && i < len(parts); i++ {
+		n, err := strconv.Atoi(parts[i])
+		if err != nil {
+			return [3]int{}, fmt.Errorf("unrecognized git version output: %q", output)
+		}
+		v[i] = n
+	}
+	return v, nil
+}
+
+// supportsRelativePaths reports whether the given git version accepts
+// `git worktree add --relative-paths` (added in git 2.48).
+func supportsRelativePaths(v [3]int) bool {
+	return v[0] > 2 || (v[0] == 2 && v[1] >= 48)
+}
+
+// worktreeAddArgs builds the args slice for `git worktree add`, including
+// --relative-paths only when the local git supports it. On version-probe
+// error we omit the flag — falling back to absolute paths is always safe.
+func (r *Runner) worktreeAddArgs(ctx context.Context, tail ...string) []string {
+	args := []string{"worktree", "add"}
+	if v, err := r.Version(ctx); err == nil && supportsRelativePaths(v) {
+		args = append(args, "--relative-paths")
+	}
+	return append(args, tail...)
+}
+
 func (r *Runner) WorktreeAdd(ctx context.Context, path, branch string) error {
-	if _, err := r.Run(ctx, "worktree", "add", "--relative-paths", path, branch); err != nil {
+	if _, err := r.Run(ctx, r.worktreeAddArgs(ctx, path, branch)...); err != nil {
 		return err
 	}
 	if err := r.EnableWorktreeConfig(ctx); err != nil {
@@ -225,7 +296,7 @@ func (r *Runner) WorktreeAdd(ctx context.Context, path, branch string) error {
 }
 
 func (r *Runner) WorktreeAddNew(ctx context.Context, path, branch, baseBranch string) error {
-	if _, err := r.Run(ctx, "worktree", "add", "--relative-paths", "-b", branch, path, baseBranch); err != nil {
+	if _, err := r.Run(ctx, r.worktreeAddArgs(ctx, "-b", branch, path, baseBranch)...); err != nil {
 		return err
 	}
 	if err := r.EnableWorktreeConfig(ctx); err != nil {
