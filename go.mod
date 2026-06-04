@@ -9,7 +9,7 @@ require (
 	github.com/catppuccin/go v0.3.0
 	github.com/charmbracelet/colorprofile v0.4.3
 	github.com/mattn/go-isatty v0.0.22
-	github.com/rogpeppe/go-internal v1.14.1
+	github.com/rogpeppe/go-internal v1.15.0
 	github.com/spf13/cobra v1.10.2
 	golang.org/x/sys v0.44.0
 	gopkg.in/yaml.v3 v3.0.1
