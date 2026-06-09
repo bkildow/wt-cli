@@ -30,6 +30,28 @@ archives:
           - zip
     name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
 
+homebrew_casks:
+  - name: wt
+    repository:
+      owner: bkildow
+      name: homebrew-tap
+      branch: main
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    homepage: "https://github.com/bkildow/wt-cli"
+    description: "CLI for managing git worktree-based development workflows"
+    license: "MIT"
+    commit_author:
+      name: goreleaser-bot
+      email: bot@goreleaser.com
+    # Clear the macOS quarantine attribute so the unsigned binary runs without
+    # a Gatekeeper prompt.
+    hooks:
+      post:
+        install: |
+          if OS.mac?
+            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/wt"]
+          end
+
 changelog:
   sort: asc
   filters:
