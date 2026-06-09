@@ -36,6 +36,21 @@
 
 ## Install
 
+### Homebrew
+
+```bash
+brew install bkildow/tap/wt
+```
+
+Or add the tap once, then install:
+
+```bash
+brew tap bkildow/tap
+brew install wt
+```
+
+### Go
+
 ```bash
 go install github.com/bkildow/wt-cli/cmd/wt@latest
 ```
