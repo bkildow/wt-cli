@@ -292,7 +292,27 @@ func (r *Runner) WorktreeAdd(ctx context.Context, path, branch string) error {
 	if err := r.EnableWorktreeConfig(ctx); err != nil {
 		return err
 	}
-	return r.SetWorktreeBareFalse(ctx, path)
+	if err := r.SetWorktreeBareFalse(ctx, path); err != nil {
+		return err
+	}
+	// Set up tracking when the branch exists upstream. A bare clone copies
+	// remote branches into refs/heads/* without tracking config, and
+	// `git worktree add` won't add it when the local branch already exists, so
+	// @{upstream}-dependent features (wt status behind-count, wt pull) break
+	// without this. Best-effort: a failure here shouldn't fail the worktree.
+	if _, err := r.Run(ctx, "rev-parse", "--verify", "origin/"+branch); err == nil {
+		if err := r.SetUpstream(ctx, branch); err != nil {
+			ui.Warning("Could not set upstream for " + branch + ": " + err.Error())
+		}
+	}
+	return nil
+}
+
+// SetUpstream points the local branch at origin/<branch> so that @{upstream},
+// `wt status` behind-counts, and `wt pull` work.
+func (r *Runner) SetUpstream(ctx context.Context, branch string) error {
+	_, err := r.Run(ctx, "branch", "--set-upstream-to=origin/"+branch, branch)
+	return err
 }
 
 func (r *Runner) WorktreeAddNew(ctx context.Context, path, branch, baseBranch string) error {

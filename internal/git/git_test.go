@@ -614,6 +614,18 @@ func TestIntegrationCloneAndWorktree(t *testing.T) {
 		t.Errorf("git status inside worktree should succeed: %v\n%s", err, out)
 	}
 
+	// WorktreeAdd should set up upstream tracking for a branch that exists on
+	// origin, so @{upstream}-dependent features (behind-count, pull) work.
+	upstreamCmd := exec.Command("git", "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}")
+	upstreamCmd.Dir = wtPath
+	out, err := upstreamCmd.CombinedOutput()
+	if err != nil {
+		t.Errorf("worktree branch should have an upstream: %v\n%s", err, out)
+	}
+	if got, want := strings.TrimSpace(string(out)), "origin/"+defaultBranch; got != want {
+		t.Errorf("upstream = %q, want %q", got, want)
+	}
+
 	// List worktrees
 	worktrees, err := runner.WorktreeList(ctx)
 	if err != nil {
