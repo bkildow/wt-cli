@@ -54,11 +54,12 @@ func runRemove(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	// If the user's shell is inside the target worktree, move the process
-	// out so git can delete the directory. Track this so we can print the
-	// project root to stdout for the shell wrapper to cd to.
-	wasInside := isInsideWorktree(selected)
-	if wasInside {
+	// If the user's shell is inside the target worktree, move the process out
+	// so git can delete the directory, and remember to print the project root
+	// to stdout so the shell wrapper cds there too. Dry-run deletes nothing,
+	// so it needs neither the chdir nor the shell hand-off.
+	relocating := isInsideWorktree(selected) && !IsDryRun()
+	if relocating {
 		if err := os.Chdir(projectRoot); err != nil {
 			return fmt.Errorf("could not change directory to project root: %w", err)
 		}
@@ -77,7 +78,7 @@ func runRemove(cmd *cobra.Command, args []string) error {
 	}
 
 	// Terminate any in-progress background setup before teardown.
-	terminateBackgroundSetup(selected.Path, selected.Branch)
+	terminateBackgroundSetup(selected.Path, selected.Branch, IsDryRun())
 
 	skipTeardown, _ := cmd.Flags().GetBool("skip-teardown")
 	if !skipTeardown {
@@ -110,7 +111,7 @@ func runRemove(cmd *cobra.Command, args []string) error {
 	ui.Success("Removed worktree: " + selected.Branch)
 
 	// Print project root to stdout so the shell wrapper can cd the user there.
-	if wasInside {
+	if relocating {
 		fmt.Println(projectRoot)
 	}
 
@@ -118,12 +119,18 @@ func runRemove(cmd *cobra.Command, args []string) error {
 }
 
 // terminateBackgroundSetup kills an in-progress background setup process.
-func terminateBackgroundSetup(worktreePath, branch string) {
+// Under dry-run it reports the process it would signal and leaves it running.
+func terminateBackgroundSetup(worktreePath, branch string, dryRun bool) {
 	state, err := project.ReadSetupState(worktreePath)
 	if err != nil || state == nil {
 		return
 	}
 	if state.Status != project.SetupRunning {
+		return
+	}
+
+	if dryRun {
+		ui.DryRunNotice(fmt.Sprintf("would terminate in-progress setup for %s (PID %d)", branch, state.PID))
 		return
 	}
 
