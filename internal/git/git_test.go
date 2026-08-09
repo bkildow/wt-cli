@@ -126,6 +126,10 @@ branch refs/heads/develop
 	}
 }
 
+// TestDryRunMode covers the state-changing commands, which dry-run skips.
+// Read-only queries are deliberately absent here: they must execute under
+// dry-run, so they are covered by TestDryRunExecutesQueries against a real
+// repository. A fake git dir would pass for the wrong reason.
 func TestDryRunMode(t *testing.T) {
 	// Redirect UI output to discard
 	ui.Output = os.Stderr
@@ -154,24 +158,6 @@ func TestDryRunMode(t *testing.T) {
 		t.Errorf("dry-run Fetch returned error: %v", err)
 	}
 
-	// HasRemoteBranch (dry-run returns false since ListRemoteBranches returns empty)
-	hasBranch, err := runner.HasRemoteBranch(ctx, "main")
-	if err != nil {
-		t.Errorf("dry-run HasRemoteBranch returned error: %v", err)
-	}
-	if hasBranch {
-		t.Errorf("dry-run HasRemoteBranch should return false")
-	}
-
-	// HasLocalBranch (dry-run returns true since Run returns nil error)
-	hasLocal, err := runner.HasLocalBranch(ctx, "main")
-	if err != nil {
-		t.Errorf("dry-run HasLocalBranch returned error: %v", err)
-	}
-	if !hasLocal {
-		t.Errorf("dry-run HasLocalBranch should return true")
-	}
-
 	// WorktreeAddNew
 	if err := runner.WorktreeAddNew(ctx, "/tmp/wt", "feature-x", "main"); err != nil {
 		t.Errorf("dry-run WorktreeAddNew returned error: %v", err)
@@ -193,24 +179,6 @@ func TestDryRunMode(t *testing.T) {
 		t.Errorf("dry-run BranchDelete (force) returned error: %v", err)
 	}
 
-	// IsWorktreeDirty
-	dirty, err := runner.IsWorktreeDirty(ctx, "/tmp/wt")
-	if err != nil {
-		t.Errorf("dry-run IsWorktreeDirty returned error: %v", err)
-	}
-	if dirty {
-		t.Errorf("dry-run IsWorktreeDirty should return false")
-	}
-
-	// IsBranchMerged
-	merged, err := runner.IsBranchMerged(ctx, "feature", "main")
-	if err != nil {
-		t.Errorf("dry-run IsBranchMerged returned error: %v", err)
-	}
-	if !merged {
-		t.Errorf("dry-run IsBranchMerged should return true")
-	}
-
 	// FetchAll
 	if err := runner.FetchAll(ctx); err != nil {
 		t.Errorf("dry-run FetchAll returned error: %v", err)
@@ -221,24 +189,6 @@ func TestDryRunMode(t *testing.T) {
 		t.Errorf("dry-run WorktreePrune returned error: %v", err)
 	}
 
-	// GetLastCommitAge
-	age, err := runner.GetLastCommitAge(ctx, "/tmp/wt")
-	if err != nil {
-		t.Errorf("dry-run GetLastCommitAge returned error: %v", err)
-	}
-	if age != "unknown" {
-		t.Errorf("dry-run GetLastCommitAge = %q, want %q", age, "unknown")
-	}
-
-	// GetBehindCount
-	behind, err := runner.GetBehindCount(ctx, "/tmp/wt")
-	if err != nil {
-		t.Errorf("dry-run GetBehindCount returned error: %v", err)
-	}
-	if behind != 0 {
-		t.Errorf("dry-run GetBehindCount = %d, want 0", behind)
-	}
-
 	// Pull
 	if err := runner.Pull(ctx, "/tmp/wt"); err != nil {
 		t.Errorf("dry-run Pull returned error: %v", err)
@@ -247,6 +197,114 @@ func TestDryRunMode(t *testing.T) {
 	// PullRebase
 	if err := runner.PullRebase(ctx, "/tmp/wt"); err != nil {
 		t.Errorf("dry-run PullRebase returned error: %v", err)
+	}
+}
+
+// TestDryRunExecutesQueries guards the regression where --dry-run stubbed out
+// read-only queries too. Commands like `wt prune` decide what to touch by
+// walking WorktreeList and asking IsBranchMerged; when those returned empty
+// and true, `wt prune --dry-run` reported "No merged worktrees to prune" in
+// every repository, no matter how many were actually merged.
+func TestDryRunExecutesQueries(t *testing.T) {
+	ui.Output = os.Stderr
+
+	repo := t.TempDir()
+	run := func(args ...string) {
+		t.Helper()
+		cmd := exec.Command("git", args...)
+		cmd.Dir = repo
+		cmd.Env = append(os.Environ(),
+			"GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@example.com",
+			"GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@example.com",
+		)
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git %s: %v\n%s", strings.Join(args, " "), err, out)
+		}
+	}
+
+	run("init", "-q", "-b", "main")
+	if err := os.WriteFile(filepath.Join(repo, "f.txt"), []byte("hi\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	run("add", "f.txt")
+	run("commit", "-qm", "initial")
+	// merged points at main, so it is an ancestor; unmerged carries its own commit.
+	run("branch", "merged")
+	run("checkout", "-qb", "unmerged")
+	if err := os.WriteFile(filepath.Join(repo, "g.txt"), []byte("yo\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	run("add", "g.txt")
+	run("commit", "-qm", "second")
+	run("checkout", "-q", "main")
+
+	runner := NewRunner(filepath.Join(repo, ".git"), true)
+	ctx := context.Background()
+
+	worktrees, err := runner.WorktreeList(ctx)
+	if err != nil {
+		t.Fatalf("dry-run WorktreeList returned error: %v", err)
+	}
+	if len(worktrees) == 0 {
+		t.Error("dry-run WorktreeList returned nothing; queries must execute under dry-run")
+	}
+
+	merged, err := runner.IsBranchMerged(ctx, "merged", "main")
+	if err != nil {
+		t.Fatalf("dry-run IsBranchMerged returned error: %v", err)
+	}
+	if !merged {
+		t.Error("dry-run IsBranchMerged(merged, main) = false, want true")
+	}
+
+	// The half that the old unconditional `return true` got wrong.
+	unmerged, err := runner.IsBranchMerged(ctx, "unmerged", "main")
+	if err != nil {
+		t.Fatalf("dry-run IsBranchMerged returned error: %v", err)
+	}
+	if unmerged {
+		t.Error("dry-run IsBranchMerged(unmerged, main) = true, want false")
+	}
+
+	hasLocal, err := runner.HasLocalBranch(ctx, "merged")
+	if err != nil {
+		t.Fatalf("dry-run HasLocalBranch returned error: %v", err)
+	}
+	if !hasLocal {
+		t.Error("dry-run HasLocalBranch(merged) = false, want true")
+	}
+	absent, err := runner.HasLocalBranch(ctx, "no-such-branch")
+	if err != nil {
+		t.Fatalf("dry-run HasLocalBranch returned error: %v", err)
+	}
+	if absent {
+		t.Error("dry-run HasLocalBranch(no-such-branch) = true, want false")
+	}
+
+	dirty, err := runner.IsWorktreeDirty(ctx, repo)
+	if err != nil {
+		t.Fatalf("dry-run IsWorktreeDirty returned error: %v", err)
+	}
+	if dirty {
+		t.Error("dry-run IsWorktreeDirty = true on a clean tree")
+	}
+	if err := os.WriteFile(filepath.Join(repo, "f.txt"), []byte("changed\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	dirty, err = runner.IsWorktreeDirty(ctx, repo)
+	if err != nil {
+		t.Fatalf("dry-run IsWorktreeDirty returned error: %v", err)
+	}
+	if !dirty {
+		t.Error("dry-run IsWorktreeDirty = false on a dirty tree")
+	}
+
+	age, err := runner.GetLastCommitAge(ctx, repo)
+	if err != nil {
+		t.Fatalf("dry-run GetLastCommitAge returned error: %v", err)
+	}
+	if age == "" || age == "unknown" {
+		t.Errorf("dry-run GetLastCommitAge = %q, want a real relative date", age)
 	}
 }
 

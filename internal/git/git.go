@@ -24,6 +24,7 @@ type WorktreeInfo struct {
 
 type Git interface {
 	Run(ctx context.Context, args ...string) (string, error)
+	Query(ctx context.Context, args ...string) (string, error)
 	CloneBare(ctx context.Context, url, dest string) error
 	ConfigureRemoteFetch(ctx context.Context) error
 	EnableWorktreeConfig(ctx context.Context) error
@@ -72,14 +73,26 @@ func batchEnv() []string {
 	return env
 }
 
+// Run executes a git command that may change repository state. Under --dry-run
+// it prints the command and returns empty output without executing.
 func (r *Runner) Run(ctx context.Context, args ...string) (string, error) {
-	fullArgs := append([]string{"--git-dir", r.GitDir}, args...)
-	cmdStr := "git " + strings.Join(fullArgs, " ")
-
 	if r.DryRun {
-		ui.DryRunNotice(cmdStr)
+		fullArgs := append([]string{"--git-dir", r.GitDir}, args...)
+		ui.DryRunNotice("git " + strings.Join(fullArgs, " "))
 		return "", nil
 	}
+
+	return r.Query(ctx, args...)
+}
+
+// Query executes a read-only git command. Unlike Run, it executes even under
+// --dry-run: dry-run suppresses the changes, but the analysis that decides
+// *which* changes to propose still needs real answers. Stubbing queries out
+// makes --dry-run report on an empty repository — see the commands that walk
+// WorktreeList before deciding what to touch.
+func (r *Runner) Query(ctx context.Context, args ...string) (string, error) {
+	fullArgs := append([]string{"--git-dir", r.GitDir}, args...)
+	cmdStr := "git " + strings.Join(fullArgs, " ")
 
 	ui.Command(cmdStr)
 	cmd := exec.CommandContext(ctx, "git", fullArgs...)
@@ -167,7 +180,7 @@ func (r *Runner) Fetch(ctx context.Context, remote string) error {
 }
 
 func (r *Runner) ListRemoteBranches(ctx context.Context) ([]string, error) {
-	output, err := r.Run(ctx, "branch", "-r")
+	output, err := r.Query(ctx, "branch", "-r")
 	if err != nil {
 		return nil, err
 	}
@@ -212,7 +225,7 @@ func (r *Runner) HasRemoteBranch(ctx context.Context, branch string) (bool, erro
 }
 
 func (r *Runner) HasLocalBranch(ctx context.Context, branch string) (bool, error) {
-	_, err := r.Run(ctx, "rev-parse", "--verify", "refs/heads/"+branch)
+	_, err := r.Query(ctx, "rev-parse", "--verify", "refs/heads/"+branch)
 	if err != nil {
 		return false, nil
 	}
@@ -335,7 +348,7 @@ func (r *Runner) WorktreeRemove(ctx context.Context, path string, force bool) er
 }
 
 func (r *Runner) WorktreeList(ctx context.Context) ([]WorktreeInfo, error) {
-	output, err := r.Run(ctx, "worktree", "list", "--porcelain")
+	output, err := r.Query(ctx, "worktree", "list", "--porcelain")
 	if err != nil {
 		return nil, err
 	}
@@ -392,11 +405,6 @@ func (r *Runner) IsWorktreeDirty(ctx context.Context, worktreePath string) (bool
 	args := []string{"-C", worktreePath, "status", "--porcelain"}
 	cmdStr := "git " + strings.Join(args, " ")
 
-	if r.DryRun {
-		ui.DryRunNotice(cmdStr)
-		return false, nil
-	}
-
 	ui.Command(cmdStr)
 	cmd := exec.CommandContext(ctx, "git", args...)
 	var stdout, stderr bytes.Buffer
@@ -417,11 +425,6 @@ func parseDirtyStatus(output string) bool {
 func (r *Runner) IsBranchMerged(ctx context.Context, branch, target string) (bool, error) {
 	args := []string{"--git-dir", r.GitDir, "merge-base", "--is-ancestor", branch, target}
 	cmdStr := "git " + strings.Join(args, " ")
-
-	if r.DryRun {
-		ui.DryRunNotice(cmdStr)
-		return true, nil
-	}
 
 	ui.Command(cmdStr)
 	cmd := exec.CommandContext(ctx, "git", args...)
@@ -447,16 +450,16 @@ func (r *Runner) FetchAll(ctx context.Context) error {
 }
 
 func (r *Runner) GetDefaultBranch(ctx context.Context) (string, error) {
-	output, err := r.Run(ctx, "symbolic-ref", "refs/remotes/origin/HEAD")
+	output, err := r.Query(ctx, "symbolic-ref", "refs/remotes/origin/HEAD")
 	if err == nil {
 		return parseDefaultBranch(output), nil
 	}
 
-	if _, err := r.Run(ctx, "show-ref", "--verify", "--quiet", "refs/heads/main"); err == nil {
+	if _, err := r.Query(ctx, "show-ref", "--verify", "--quiet", "refs/heads/main"); err == nil {
 		return "main", nil
 	}
 
-	if _, err := r.Run(ctx, "show-ref", "--verify", "--quiet", "refs/heads/master"); err == nil {
+	if _, err := r.Query(ctx, "show-ref", "--verify", "--quiet", "refs/heads/master"); err == nil {
 		return "master", nil
 	}
 
@@ -467,10 +470,10 @@ func (r *Runner) GetDefaultBranch(ctx context.Context) (string, error) {
 // It tries origin/<branch> first (for bare repos), then the local branch,
 // and falls back to HEAD if neither exists.
 func (r *Runner) ResolveStartPoint(ctx context.Context, branch string) string {
-	if _, err := r.Run(ctx, "rev-parse", "--verify", "origin/"+branch); err == nil {
+	if _, err := r.Query(ctx, "rev-parse", "--verify", "origin/"+branch); err == nil {
 		return "origin/" + branch
 	}
-	if _, err := r.Run(ctx, "rev-parse", "--verify", branch); err == nil {
+	if _, err := r.Query(ctx, "rev-parse", "--verify", branch); err == nil {
 		return branch
 	}
 	return "HEAD"
@@ -484,11 +487,6 @@ func (r *Runner) WorktreePrune(ctx context.Context) error {
 func (r *Runner) GetLastCommitAge(ctx context.Context, worktreePath string) (string, error) {
 	args := []string{"-C", worktreePath, "log", "-1", "--format=%cr"}
 	cmdStr := "git " + strings.Join(args, " ")
-
-	if r.DryRun {
-		ui.DryRunNotice(cmdStr)
-		return "unknown", nil
-	}
 
 	ui.Command(cmdStr)
 	cmd := exec.CommandContext(ctx, "git", args...)
@@ -506,12 +504,6 @@ func (r *Runner) GetLastCommitAge(ctx context.Context, worktreePath string) (str
 func (r *Runner) GetBehindCount(ctx context.Context, worktreePath string) (int, error) {
 	checkArgs := []string{"-C", worktreePath, "rev-parse", "--verify", "--quiet", "@{upstream}"}
 	checkStr := "git " + strings.Join(checkArgs, " ")
-
-	if r.DryRun {
-		ui.DryRunNotice(checkStr)
-		ui.DryRunNotice("git -C " + worktreePath + " rev-list --count HEAD..@{upstream}")
-		return 0, nil
-	}
 
 	ui.Command(checkStr)
 	if err := exec.CommandContext(ctx, "git", checkArgs...).Run(); err != nil {
