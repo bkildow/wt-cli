@@ -36,6 +36,7 @@ func runStatus(cmd *cobra.Command, args []string) error {
 
 	if len(filtered) == 0 {
 		ui.Info("No worktrees found. Use 'wt add' to create one.")
+		warnLowDisk(projectRoot, cfg)
 		return nil
 	}
 
@@ -73,6 +74,7 @@ func runStatus(cmd *cobra.Command, args []string) error {
 		t.Row(wt.Branch, relPath, shortHead, styledStatus, styledSetup, age)
 	}
 	ui.PrintTable(t)
+	warnLowDisk(projectRoot, cfg)
 	return nil
 }
 

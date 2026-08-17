@@ -47,6 +47,8 @@ func setupEnv(env *testscript.Env) error {
 	env.Setenv("GIT_COMMITTER_EMAIL", "test@test.com")
 	env.Setenv("GIT_CONFIG_NOSYSTEM", "1")
 	env.Setenv("GIT_PAGER", "cat")
+	// A low-disk CI runner would otherwise inject a warning into command output.
+	env.Setenv("WT_NO_DISK_WARN", "1")
 	return nil
 }
 

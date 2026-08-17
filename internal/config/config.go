@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/bkildow/wt-cli/internal/disk"
 	"gopkg.in/yaml.v3"
 )
 
@@ -36,6 +37,37 @@ type Config struct {
 	ParallelTeardown []string `yaml:"parallel_teardown,omitempty"`
 	BackgroundSetup  bool     `yaml:"background_setup,omitempty"`
 	Editor           string   `yaml:"editor,omitempty"`
+
+	// DiskWarn gates the low-disk-space warning. It is a pointer because the
+	// warning defaults to on, so the zero value cannot mean "disabled".
+	DiskWarn        *bool `yaml:"disk_warn,omitempty"`
+	DiskWarnPercent int   `yaml:"disk_warn_percent,omitempty"`
+	DiskWarnGB      int   `yaml:"disk_warn_gb,omitempty"`
+}
+
+// DiskThreshold returns the configured low-disk thresholds, or nil when disk
+// warnings are disabled. Unset fields fall back to defaults; a negative value
+// disables that individual bound.
+func (c *Config) DiskThreshold() *disk.Threshold {
+	if c.DiskWarn != nil && !*c.DiskWarn {
+		return nil
+	}
+
+	t := disk.DefaultThreshold()
+	switch {
+	case c.DiskWarnPercent < 0:
+		t.Percent = 0
+	case c.DiskWarnPercent > 0:
+		t.Percent = float64(c.DiskWarnPercent)
+	}
+	switch {
+	case c.DiskWarnGB < 0:
+		t.Bytes = 0
+	case c.DiskWarnGB > 0:
+		t.Bytes = uint64(c.DiskWarnGB) * disk.BytesPerGB
+	}
+
+	return &t
 }
 
 // MainBranchOrDefault returns the configured main branch, falling back to DefaultMainBranch.
@@ -147,6 +179,28 @@ func renderAnnotatedConfig(cfg *Config) string {
 		b.WriteString("background_setup: true\n")
 	} else {
 		b.WriteString("# background_setup: false\n")
+	}
+
+	b.WriteString("\n# Warn when free disk space runs low and suggest 'wt prune' (default: on)\n")
+	b.WriteString("# Checked on 'wt add' and 'wt status'. Set WT_NO_DISK_WARN=1 to silence per-command.\n")
+	if cfg != nil && cfg.DiskWarn != nil && !*cfg.DiskWarn {
+		b.WriteString("disk_warn: false\n")
+	} else {
+		b.WriteString("# disk_warn: false\n")
+	}
+
+	b.WriteString("\n# Warn below this percentage of free space (-1 to disable this bound)\n")
+	if cfg != nil && cfg.DiskWarnPercent != 0 {
+		fmt.Fprintf(&b, "disk_warn_percent: %d\n", cfg.DiskWarnPercent)
+	} else {
+		fmt.Fprintf(&b, "# disk_warn_percent: %d\n", disk.DefaultWarnPercent)
+	}
+
+	b.WriteString("\n# Warn below this many GB of free space (-1 to disable this bound)\n")
+	if cfg != nil && cfg.DiskWarnGB != 0 {
+		fmt.Fprintf(&b, "disk_warn_gb: %d\n", cfg.DiskWarnGB)
+	} else {
+		fmt.Fprintf(&b, "# disk_warn_gb: %d\n", disk.DefaultWarnGB)
 	}
 
 	b.WriteString("\n# Commands to run after creating a new worktree\n")

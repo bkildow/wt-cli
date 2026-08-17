@@ -37,6 +37,9 @@ func runAdd(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	// Warn before the new worktree starts consuming space.
+	warnLowDisk(projectRoot, cfg)
+
 	gitDir := project.GitDirPath(projectRoot, cfg)
 	runner := git.NewRunner(gitDir, dry)
 
