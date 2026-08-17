@@ -232,7 +232,7 @@ func runClaudeHookWorktreeRemove(cmd *cobra.Command, _ []string) error {
 	}
 
 	// Terminate any in-progress background setup.
-	terminateBackgroundSetup(worktreePath, branch)
+	terminateBackgroundSetup(worktreePath, branch, false)
 
 	// Run teardown hooks.
 	if err := project.RunTeardownHooks(ctx, cfg, worktreePath, false); err != nil {
