@@ -50,6 +50,21 @@ func setupEnv(env *testscript.Env) error {
 	return nil
 }
 
+// gitEnv returns the environment for git commands run from the setup helpers.
+// These run outside the testscript environment, so they do not inherit the
+// identity set in setupEnv and would otherwise depend on the caller's global
+// git config -- which is absent on CI runners, where commit fails outright.
+func gitEnv() []string {
+	return append(
+		os.Environ(),
+		"GIT_AUTHOR_NAME=Test",
+		"GIT_AUTHOR_EMAIL=test@test.com",
+		"GIT_COMMITTER_NAME=Test",
+		"GIT_COMMITTER_EMAIL=test@test.com",
+		"GIT_CONFIG_NOSYSTEM=1",
+	)
+}
+
 // cmdSetupRepo creates a git repository at $WORK/remote with an initial
 // commit. Additional branch names can be passed as arguments.
 func cmdSetupRepo(ts *testscript.TestScript, neg bool, args []string) {
@@ -61,6 +76,7 @@ func cmdSetupRepo(ts *testscript.TestScript, neg bool, args []string) {
 	gitRun := func(gitArgs ...string) {
 		c := exec.Command("git", gitArgs...)
 		c.Dir = repoDir
+		c.Env = gitEnv()
 		out, err := c.CombinedOutput()
 		if err != nil {
 			ts.Fatalf("git %v: %v\n%s", gitArgs, err, out)
@@ -71,7 +87,10 @@ func cmdSetupRepo(ts *testscript.TestScript, neg bool, args []string) {
 		ts.Fatalf("mkdir remote: %v", err)
 	}
 
-	gitRun("init")
+	// Pin the initial branch name. Without -b the branch comes from the
+	// ambient init.defaultBranch, so the scripts (which reference master
+	// explicitly) fail for anyone whose git defaults to main.
+	gitRun("init", "-b", "master")
 
 	readme := filepath.Join(repoDir, "README.md")
 	if err := os.WriteFile(readme, []byte("# Test Repo\n"), 0o644); err != nil {
@@ -99,6 +118,7 @@ func cmdSetupProject(ts *testscript.TestScript, neg bool, args []string) { //nol
 	bareDir := filepath.Join(projectDir, config.DefaultGitDir)
 
 	c := exec.Command("git", "clone", "--bare", remoteDir, bareDir)
+	c.Env = gitEnv()
 	out, err := c.CombinedOutput()
 	if err != nil {
 		ts.Fatalf("git clone --bare: %v\n%s", err, out)
@@ -106,6 +126,7 @@ func cmdSetupProject(ts *testscript.TestScript, neg bool, args []string) { //nol
 
 	gitRun := func(gitArgs ...string) {
 		c := exec.Command("git", append([]string{"--git-dir", bareDir}, gitArgs...)...)
+		c.Env = gitEnv()
 		out, err := c.CombinedOutput()
 		if err != nil {
 			ts.Fatalf("git %v: %v\n%s", gitArgs, err, out)
