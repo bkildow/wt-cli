@@ -30,6 +30,8 @@
 
 ## Requirements
 
+- **macOS or Linux.** Windows is not supported — `wt` leans on POSIX process
+  handling and runs setup hooks through a POSIX shell.
 - **Go 1.25+** (for building from source)
 - **Git 2.20+** (for `extensions.worktreeConfig` and `git config --worktree`)
   - Git 2.48+ additionally enables relative-path worktrees, making the project directory portable (move/rename without breaking `.git` pointers). On older git, worktrees still work — they just use absolute paths.
@@ -280,7 +282,7 @@ project/
 
 **Copy vs Symlink:** Files in `shared/copy/` are duplicated into each worktree (useful for `.env` files that vary per branch). Files in `shared/symlink/` are symlinked (useful for large directories like `node_modules` you only want to install once).
 
-**Reflink copies:** On filesystems that support copy-on-write cloning — APFS on macOS, btrfs on Linux, and XFS formatted with `reflink=1` — `wt` clones files in `shared/copy/` instead of reading and rewriting every byte. Clones share on-disk blocks with the source until one side is modified, so a 1 GB `vendor/` directory creates a new worktree in milliseconds and occupies no extra disk space. On other filesystems (ext4, NFS, tmpfs, Windows, cross-volume copies), `wt` falls back to a normal byte-for-byte copy automatically — no configuration required. Docker bind mounts work fine with reflinked files.
+**Reflink copies:** On filesystems that support copy-on-write cloning — APFS on macOS, btrfs on Linux, and XFS formatted with `reflink=1` — `wt` clones files in `shared/copy/` instead of reading and rewriting every byte. Clones share on-disk blocks with the source until one side is modified, so a 1 GB `vendor/` directory creates a new worktree in milliseconds and occupies no extra disk space. On other filesystems (ext4, NFS, tmpfs, cross-volume copies), `wt` falls back to a normal byte-for-byte copy automatically — no configuration required. Docker bind mounts work fine with reflinked files.
 
 ## Configuration
 

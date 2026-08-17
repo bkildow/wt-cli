@@ -1,5 +1,3 @@
-//go:build !windows
-
 package project
 
 import "syscall"
