@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/bkildow/wt-cli/internal/disk"
 )
 
 func TestLoadValidConfig(t *testing.T) {
@@ -213,6 +215,15 @@ func TestWriteAnnotated(t *testing.T) {
 	}
 	if !strings.Contains(content, "# parallel_teardown:") {
 		t.Error("parallel_teardown should be commented out as example")
+	}
+	if !strings.Contains(content, "# disk_warn: false") {
+		t.Error("disk_warn should be commented out as example")
+	}
+	if !strings.Contains(content, "# disk_warn_percent: 10") {
+		t.Error("disk_warn_percent should be commented out with its default")
+	}
+	if !strings.Contains(content, "# disk_warn_gb: 10") {
+		t.Error("disk_warn_gb should be commented out with its default")
 	}
 
 	// Should be loadable
@@ -446,5 +457,156 @@ func TestYamlQuote(t *testing.T) {
 		if got != tt.want {
 			t.Errorf("yamlQuote(%q) = %q, want %q", tt.input, got, tt.want)
 		}
+	}
+}
+
+func TestDiskThresholdDefaults(t *testing.T) {
+	cfg := DefaultConfig()
+
+	got := cfg.DiskThreshold()
+	if got == nil {
+		t.Fatal("DiskThreshold() = nil, want defaults when disk_warn is unset")
+	}
+	if got.Percent != disk.DefaultWarnPercent {
+		t.Errorf("Percent = %v, want %v", got.Percent, float64(disk.DefaultWarnPercent))
+	}
+	if got.Bytes != disk.DefaultWarnGB*disk.BytesPerGB {
+		t.Errorf("Bytes = %v, want %v", got.Bytes, disk.DefaultWarnGB*disk.BytesPerGB)
+	}
+}
+
+func TestDiskThresholdOverrides(t *testing.T) {
+	enabled, disabled := true, false
+
+	tests := []struct {
+		name        string
+		cfg         Config
+		wantNil     bool
+		wantPercent float64
+		wantBytes   uint64
+	}{
+		{
+			name:    "disk_warn false disables warnings",
+			cfg:     Config{DiskWarn: &disabled},
+			wantNil: true,
+		},
+		{
+			name:        "disk_warn true keeps defaults",
+			cfg:         Config{DiskWarn: &enabled},
+			wantPercent: disk.DefaultWarnPercent,
+			wantBytes:   disk.DefaultWarnGB * disk.BytesPerGB,
+		},
+		{
+			name:        "custom bounds",
+			cfg:         Config{DiskWarnPercent: 25, DiskWarnGB: 50},
+			wantPercent: 25,
+			wantBytes:   50 * disk.BytesPerGB,
+		},
+		{
+			name:        "negative percent disables only that bound",
+			cfg:         Config{DiskWarnPercent: -1, DiskWarnGB: 5},
+			wantPercent: 0,
+			wantBytes:   5 * disk.BytesPerGB,
+		},
+		{
+			name:        "negative gb disables only that bound",
+			cfg:         Config{DiskWarnPercent: 5, DiskWarnGB: -1},
+			wantPercent: 5,
+			wantBytes:   0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := tt.cfg
+			got := cfg.DiskThreshold()
+
+			if tt.wantNil {
+				if got != nil {
+					t.Fatalf("DiskThreshold() = %+v, want nil", *got)
+				}
+				return
+			}
+			if got == nil {
+				t.Fatal("DiskThreshold() = nil, want a threshold")
+			}
+			if got.Percent != tt.wantPercent {
+				t.Errorf("Percent = %v, want %v", got.Percent, tt.wantPercent)
+			}
+			if got.Bytes != tt.wantBytes {
+				t.Errorf("Bytes = %v, want %v", got.Bytes, tt.wantBytes)
+			}
+		})
+	}
+}
+
+func TestLoadConfigWithDiskSettings(t *testing.T) {
+	dir := t.TempDir()
+	content := `version: 1
+disk_warn: false
+disk_warn_percent: 20
+disk_warn_gb: 40
+`
+	if err := os.WriteFile(filepath.Join(dir, ConfigFileName), []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := Load(dir)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if cfg.DiskWarn == nil || *cfg.DiskWarn {
+		t.Errorf("disk_warn = %v, want false", cfg.DiskWarn)
+	}
+	if cfg.DiskWarnPercent != 20 {
+		t.Errorf("disk_warn_percent = %d, want 20", cfg.DiskWarnPercent)
+	}
+	if cfg.DiskWarnGB != 40 {
+		t.Errorf("disk_warn_gb = %d, want 40", cfg.DiskWarnGB)
+	}
+	if cfg.DiskThreshold() != nil {
+		t.Error("DiskThreshold() should be nil when disk_warn is false")
+	}
+}
+
+func TestWriteAnnotatedWithDiskValues(t *testing.T) {
+	dir := t.TempDir()
+	disabled := false
+
+	existing := DefaultConfig()
+	existing.DiskWarn = &disabled
+	existing.DiskWarnPercent = 25
+	existing.DiskWarnGB = 30
+
+	if err := WriteAnnotatedWithValues(dir, &existing); err != nil {
+		t.Fatalf("WriteAnnotatedWithValues error: %v", err)
+	}
+
+	data, err := os.ReadFile(filepath.Join(dir, ConfigFileName))
+	if err != nil {
+		t.Fatalf("read error: %v", err)
+	}
+	content := string(data)
+
+	for _, want := range []string{"disk_warn: false", "disk_warn_percent: 25", "disk_warn_gb: 30"} {
+		if !strings.Contains(content, want) {
+			t.Errorf("missing %q in annotated config", want)
+		}
+		if strings.Contains(content, "# "+want) {
+			t.Errorf("%q should not be commented out when a value exists", want)
+		}
+	}
+
+	// Values must survive the round trip.
+	reloaded, err := Load(dir)
+	if err != nil {
+		t.Fatalf("annotated config should be loadable: %v", err)
+	}
+	if reloaded.DiskWarn == nil || *reloaded.DiskWarn {
+		t.Errorf("disk_warn = %v, want false", reloaded.DiskWarn)
+	}
+	if reloaded.DiskWarnPercent != 25 || reloaded.DiskWarnGB != 30 {
+		t.Errorf("thresholds = %d%%/%dGB, want 25%%/30GB", reloaded.DiskWarnPercent, reloaded.DiskWarnGB)
 	}
 }

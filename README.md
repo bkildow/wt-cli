@@ -203,6 +203,8 @@ wt status
 
 Shows branch, path, commit hash, dirty/clean status, and last commit age for all worktrees.
 
+Also warns when the project's filesystem is running low on space — see [Low Disk Space Warnings](#low-disk-space-warnings).
+
 ### wt sync
 
 ```bash
@@ -311,6 +313,9 @@ parallel_teardown:
 | `parallel_setup` | Commands to run concurrently after serial setup hooks | `[]` |
 | `teardown` | Commands to run sequentially before removing a worktree | `[]` |
 | `parallel_teardown` | Commands to run concurrently after serial teardown hooks | `[]` |
+| `disk_warn` | Warn when free disk space is low (`false` disables) | `true` |
+| `disk_warn_percent` | Warn below this percentage of free space (`-1` disables this bound) | `10` |
+| `disk_warn_gb` | Warn below this many GB of free space (`-1` disables this bound) | `10` |
 
 ### Setup & Teardown Hooks
 
@@ -328,6 +333,20 @@ Use `parallel_setup` and `parallel_teardown` for independent commands that can r
 2. Parallel hooks run after serial hooks complete (`parallel_setup` / `parallel_teardown`)
 
 All parallel commands start simultaneously and run to completion — a failing command does not cancel the others. Each command's output is prefixed with `[command]` to distinguish interleaved output. `--skip-setup` and `--skip-teardown` skip both serial and parallel hooks.
+
+### Low Disk Space Warnings
+
+Running many worktrees at once (each with its own containers, `node_modules`, DB volumes, and build caches) adds up quickly. `wt add` and `wt status` check free space on the project's filesystem and warn when it runs low:
+
+```
+⚠ Low disk space: 6.2 GB free of 460 GB (1% free)
+→ Run 'wt prune' to remove worktrees for merged branches.
+→ No teardown hooks are configured, so 'wt prune' frees worktree directories but not docker volumes or other external resources.
+```
+
+The check warns when free space is below **either** bound (`disk_warn_percent` or `disk_warn_gb`); set a bound to `-1` to disable it individually. The last line only appears when no `teardown`/`parallel_teardown` hooks are configured, since without them `wt prune` cannot reclaim resources living outside the worktree directory.
+
+Disable the warning permanently with `disk_warn: false` in `.worktree.yml`, or per-invocation with `WT_NO_DISK_WARN=1`.
 
 ### Template Variables
 
