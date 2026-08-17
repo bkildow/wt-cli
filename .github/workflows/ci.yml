@@ -33,14 +33,6 @@ jobs:
         with:
           go-version-file: go.mod
 
-      # The integration tests shell out to git and create real repositories.
-      # Runners have no committer identity or default branch name configured.
-      - name: Configure git
-        run: |
-          git config --global user.name "CI"
-          git config --global user.email "ci@example.invalid"
-          git config --global init.defaultBranch main
-
       - name: Build
         run: go build ./...
 

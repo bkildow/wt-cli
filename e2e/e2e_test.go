@@ -71,7 +71,10 @@ func cmdSetupRepo(ts *testscript.TestScript, neg bool, args []string) {
 		ts.Fatalf("mkdir remote: %v", err)
 	}
 
-	gitRun("init")
+	// Pin the initial branch name. Without -b the branch comes from the
+	// ambient init.defaultBranch, so the scripts (which reference master
+	// explicitly) fail for anyone whose git defaults to main.
+	gitRun("init", "-b", "master")
 
 	readme := filepath.Join(repoDir, "README.md")
 	if err := os.WriteFile(readme, []byte("# Test Repo\n"), 0o644); err != nil {
