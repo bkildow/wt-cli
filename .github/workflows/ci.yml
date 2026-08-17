@@ -55,8 +55,16 @@ jobs:
           done
 
   lint:
-    name: lint
+    name: lint (${{ matrix.goos }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Platform-specific files compile for exactly one GOOS, so linting a
+        # single target silently skips the rest -- which is how a Linux-only
+        # finding in internal/disk/stat.go stayed hidden while lint was run
+        # on macOS.
+        goos: [linux, darwin]
     steps:
       - uses: actions/checkout@v7
 
@@ -65,5 +73,7 @@ jobs:
           go-version-file: go.mod
 
       - uses: golangci/golangci-lint-action@v9
+        env:
+          GOOS: ${{ matrix.goos }}
         with:
           version: v2.12.2
