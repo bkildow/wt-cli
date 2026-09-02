@@ -89,24 +89,38 @@ func (r *mergeRepo) runner() *Runner {
 	return NewRunner(filepath.Join(r.dir, ".git"), false)
 }
 
-// objectCount counts loose and packed object files, to prove merge detection
-// leaves the repository alone.
-func (r *mergeRepo) objectCount() int {
+// probeSHA recomputes the synthetic commit isSquashMerged builds for a branch.
+// probeEnv fixes the identity and the dates, so the SHA is deterministic and
+// the test can look for that exact object in the repo afterwards.
+func (r *mergeRepo) probeSHA(branch, target string) string {
 	r.t.Helper()
-	count := 0
-	err := filepath.Walk(filepath.Join(r.dir, ".git", "objects"), func(_ string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		if !info.IsDir() {
-			count++
-		}
-		return nil
-	})
+
+	runner := r.runner()
+	ctx := context.Background()
+
+	base, err := runner.Query(ctx, "merge-base", target, branch)
 	if err != nil {
 		r.t.Fatal(err)
 	}
-	return count
+	tree, err := runner.Query(ctx, "rev-parse", branch+"^{tree}")
+	if err != nil {
+		r.t.Fatal(err)
+	}
+
+	sha, err := runner.queryWithEnv(ctx, probeEnv(r.t.TempDir(), runner.GitDir),
+		"commit-tree", tree, "-p", base, "-m", "wt-merge-probe")
+	if err != nil {
+		r.t.Fatal(err)
+	}
+	return sha
+}
+
+// hasObject reports whether the repository itself contains an object, ignoring
+// any throwaway object store.
+func (r *mergeRepo) hasObject(sha string) bool {
+	r.t.Helper()
+	_, err := r.runner().Query(context.Background(), "cat-file", "-e", sha)
+	return err == nil
 }
 
 // TestBranchMergeStatus covers each way work reaches main: a true merge, a
@@ -235,7 +249,13 @@ func TestBranchMergeStatusDoesNotWriteToRepo(t *testing.T) {
 	r.git("merge", "-q", "--squash", "squashed")
 	r.git("commit", "-qm", "squashed everything")
 
-	before := r.objectCount()
+	// The probe object is what must never land in the repo. Counting object
+	// files cannot tell an addition from git repacking behind our back, so look
+	// for the exact commit the probe builds.
+	probe := r.probeSHA("squashed", "main")
+	if r.hasObject(probe) {
+		t.Fatalf("probe commit %s was already in the repo before the check ran", probe)
+	}
 
 	got, err := r.runner().BranchMergeStatus(context.Background(), "squashed", "main")
 	if err != nil {
@@ -245,8 +265,8 @@ func TestBranchMergeStatusDoesNotWriteToRepo(t *testing.T) {
 		t.Fatalf("BranchMergeStatus = %q, want %q (the probe must have run)", got.Method, MergeSquash)
 	}
 
-	if after := r.objectCount(); after != before {
-		t.Errorf("object count went from %d to %d; the squash probe must not write to the repo", before, after)
+	if r.hasObject(probe) {
+		t.Errorf("probe commit %s was written into the repo; it belongs in the throwaway object store", probe)
 	}
 }
 
