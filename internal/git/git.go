@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -41,6 +42,8 @@ type Git interface {
 	BranchDelete(ctx context.Context, branch string, force bool) error
 	IsWorktreeDirty(ctx context.Context, worktreePath string) (bool, error)
 	IsBranchMerged(ctx context.Context, branch, target string) (bool, error)
+	BranchMergeStatus(ctx context.Context, branch, target string) (MergeStatus, error)
+	RemoteURL(ctx context.Context, remote string) (string, error)
 	FetchAll(ctx context.Context) error
 	GetDefaultBranch(ctx context.Context) (string, error)
 	GetLastCommitAge(ctx context.Context, worktreePath string) (string, error)
@@ -91,6 +94,13 @@ func (r *Runner) Run(ctx context.Context, args ...string) (string, error) {
 // makes --dry-run report on an empty repository — see the commands that walk
 // WorktreeList before deciding what to touch.
 func (r *Runner) Query(ctx context.Context, args ...string) (string, error) {
+	return r.queryWithEnv(ctx, nil, args...)
+}
+
+// queryWithEnv is Query with extra environment variables appended, for the few
+// callers that need to steer git itself (an isolated object store, a synthetic
+// commit identity) rather than just pass flags.
+func (r *Runner) queryWithEnv(ctx context.Context, extraEnv []string, args ...string) (string, error) {
 	fullArgs := append([]string{"--git-dir", r.GitDir}, args...)
 	cmdStr := "git " + strings.Join(fullArgs, " ")
 
@@ -101,6 +111,12 @@ func (r *Runner) Query(ctx context.Context, args ...string) (string, error) {
 	cmd.Stderr = &stderr
 	if r.BatchMode {
 		cmd.Env = batchEnv()
+	}
+	if len(extraEnv) > 0 {
+		if cmd.Env == nil {
+			cmd.Env = os.Environ()
+		}
+		cmd.Env = append(cmd.Env, extraEnv...)
 	}
 
 	if err := cmd.Run(); err != nil {
@@ -442,6 +458,170 @@ func (r *Runner) IsBranchMerged(ctx context.Context, branch, target string) (boo
 	}
 
 	return true, nil
+}
+
+// MergeMethod identifies how a branch's work reached the target branch. The
+// distinction matters because only MergeAncestor satisfies `git branch -d`.
+type MergeMethod string
+
+const (
+	MergeNone     MergeMethod = ""
+	MergeAncestor MergeMethod = "ancestor"
+	MergeRebase   MergeMethod = "rebase"
+	MergeSquash   MergeMethod = "squash"
+	// MergeEquivalent covers a single-commit branch whose commit has an
+	// equivalent in the target. Squash and rebase merges are indistinguishable
+	// in that case, so neither label would be honest.
+	MergeEquivalent MergeMethod = "equivalent"
+)
+
+// MergeStatus is the result of BranchMergeStatus.
+type MergeStatus struct {
+	Merged bool
+	Method MergeMethod
+}
+
+// BranchMergeStatus reports whether branch's work is already contained in
+// target, and by which route. It escalates through three checks because the
+// cheap ancestor test only recognizes fast-forward and true merge commits:
+// squash and rebase merges rewrite the commits, so the branch tip is never an
+// ancestor of the target.
+//
+//  1. ancestor  — git merge-base --is-ancestor
+//  2. rebase    — git cherry: patch-ids survive a rebase, so every commit on
+//     the branch shows up as an equivalent ("-") commit in target. With a
+//     single commit this is reported as MergeEquivalent, since a one-commit
+//     squash produces exactly the same evidence.
+//  3. squash    — a synthetic commit holding the branch's whole tree on top of
+//     the merge base. Its patch-id equals the branch's combined diff, which is
+//     exactly what a squash commit contains. Check 2 cannot find this for a
+//     multi-commit branch, since no individual commit matches the squash.
+//
+// The squash probe needs a commit object to hand to git cherry. It is written
+// to a throwaway object store (GIT_OBJECT_DIRECTORY) with the real repo as an
+// alternate, so the managed repo is never modified — including under
+// --dry-run, where the probe still has to run for prune to report the right
+// set of worktrees. Any failure degrades to "not squash-merged" rather than
+// failing the whole check.
+func (r *Runner) BranchMergeStatus(ctx context.Context, branch, target string) (MergeStatus, error) {
+	ancestor, err := r.IsBranchMerged(ctx, branch, target)
+	if err != nil {
+		return MergeStatus{}, err
+	}
+	if ancestor {
+		return MergeStatus{Merged: true, Method: MergeAncestor}, nil
+	}
+
+	cherry, err := r.Query(ctx, "cherry", target, branch)
+	if err != nil {
+		return MergeStatus{}, err
+	}
+	if equivalent, commits := parseCherryEquivalent(cherry); equivalent {
+		method := MergeRebase
+		if commits == 1 {
+			method = MergeEquivalent
+		}
+		return MergeStatus{Merged: true, Method: method}, nil
+	}
+
+	// A failing probe means "could not prove a squash merge", which is the same
+	// actionable answer as "not squash-merged": the two cheaper checks have
+	// already ruled out the other routes.
+	if squashed, err := r.isSquashMerged(ctx, branch, target); err == nil && squashed {
+		return MergeStatus{Merged: true, Method: MergeSquash}, nil
+	}
+
+	return MergeStatus{Merged: false, Method: MergeNone}, nil
+}
+
+func (r *Runner) isSquashMerged(ctx context.Context, branch, target string) (bool, error) {
+	base, err := r.Query(ctx, "merge-base", target, branch)
+	if err != nil {
+		return false, err
+	}
+	if base == "" {
+		return false, nil
+	}
+
+	branchTree, err := r.Query(ctx, "rev-parse", branch+"^{tree}")
+	if err != nil {
+		return false, err
+	}
+	baseTree, err := r.Query(ctx, "rev-parse", base+"^{tree}")
+	if err != nil {
+		return false, err
+	}
+
+	// No content change relative to the merge base: there is nothing to find in
+	// the target, and probing with an empty patch would match spuriously.
+	if branchTree == baseTree {
+		return false, nil
+	}
+
+	probeDir, err := os.MkdirTemp("", "wt-merge-probe-")
+	if err != nil {
+		return false, err
+	}
+	defer func() { _ = os.RemoveAll(probeDir) }()
+
+	env := probeEnv(probeDir, r.GitDir)
+
+	probe, err := r.queryWithEnv(ctx, env, "commit-tree", branchTree, "-p", base, "-m", "wt-merge-probe")
+	if err != nil {
+		return false, err
+	}
+
+	out, err := r.queryWithEnv(ctx, env, "cherry", target, probe)
+	if err != nil {
+		return false, err
+	}
+
+	merged, _ := parseCherryEquivalent(out)
+	return merged, nil
+}
+
+// probeEnv points git at a throwaway object store backed by the real repo, and
+// supplies a fixed identity. git commit-tree refuses to run without user.name
+// and user.email, which are routinely unset in CI and fresh containers, and the
+// identity is arbitrary anyway: the probe commit exists only long enough for
+// git cherry to compute its patch-id.
+func probeEnv(probeDir, gitDir string) []string {
+	return []string{
+		"GIT_OBJECT_DIRECTORY=" + probeDir,
+		"GIT_ALTERNATE_OBJECT_DIRECTORIES=" + filepath.Join(gitDir, "objects"),
+		"GIT_AUTHOR_NAME=wt", "GIT_AUTHOR_EMAIL=wt@localhost",
+		"GIT_COMMITTER_NAME=wt", "GIT_COMMITTER_EMAIL=wt@localhost",
+		"GIT_AUTHOR_DATE=@0 +0000", "GIT_COMMITTER_DATE=@0 +0000",
+	}
+}
+
+// parseCherryEquivalent reports whether every commit listed by `git cherry` has
+// an equivalent in the upstream branch, along with how many commits were
+// listed. git cherry prefixes each commit with "-" when an equivalent patch
+// exists upstream and "+" when it does not, so a single "+" means unmerged work
+// remains. Empty output means the branch has no commits of its own to account
+// for, which is not evidence of a merge. The count lets callers tell a
+// multi-commit rebase merge from the ambiguous single-commit case.
+func parseCherryEquivalent(out string) (equivalent bool, commits int) {
+	lines := strings.Split(strings.TrimSpace(out), "\n")
+	count := 0
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		if !strings.HasPrefix(line, "- ") {
+			return false, 0
+		}
+		count++
+	}
+	return count > 0, count
+}
+
+// RemoteURL returns the configured URL for a remote, e.g. to detect which
+// forge (if any) backs the repository.
+func (r *Runner) RemoteURL(ctx context.Context, remote string) (string, error) {
+	return r.Query(ctx, "remote", "get-url", remote)
 }
 
 func (r *Runner) FetchAll(ctx context.Context) error {

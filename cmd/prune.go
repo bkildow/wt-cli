@@ -1,10 +1,12 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
 
+	"github.com/bkildow/wt-cli/internal/forge"
 	"github.com/bkildow/wt-cli/internal/git"
 	"github.com/bkildow/wt-cli/internal/project"
 	"github.com/bkildow/wt-cli/internal/ui"
@@ -21,6 +23,58 @@ func newPruneCmd() *cobra.Command {
 	cmd.Flags().Bool("force", false, "Skip confirmation prompt")
 	cmd.Flags().Bool("skip-teardown", false, "Skip running teardown hooks before removing worktrees")
 	return cmd
+}
+
+// prunable pairs a worktree with why it was judged merged, so the removal loop
+// and the listing can both explain themselves.
+type prunable struct {
+	worktree git.WorktreeInfo
+	method   git.MergeMethod
+	reason   string
+}
+
+func mergeReason(method git.MergeMethod) string {
+	switch method {
+	case git.MergeRebase:
+		return "merged (rebase)"
+	case git.MergeSquash:
+		return "merged (squash)"
+	case git.MergeEquivalent:
+		return "merged (patch-equivalent)"
+	default:
+		return "merged"
+	}
+}
+
+// prMerged reports whether a pull request is trustworthy evidence that this
+// worktree's branch is done. State alone is not enough: gh matches PRs by head
+// branch *name*, so a reused branch name or commits pushed after the merge
+// would otherwise get a live worktree deleted. The PR must have merged into the
+// branch prune is comparing against, and its head must still be the commit the
+// worktree is sitting on.
+func prMerged(ctx context.Context, runner *git.Runner, pr *forge.PullRequest, wt git.WorktreeInfo, defaultBranch string) bool {
+	if pr == nil || pr.State != forge.StateMerged {
+		return false
+	}
+
+	if pr.BaseRef != "" && pr.BaseRef != defaultBranch {
+		return false
+	}
+
+	if pr.HeadOID == "" {
+		return false
+	}
+
+	head := wt.Head
+	if head == "" {
+		resolved, err := runner.Query(ctx, "rev-parse", wt.Branch)
+		if err != nil {
+			return false
+		}
+		head = resolved
+	}
+
+	return head == pr.HeadOID
 }
 
 func runPrune(cmd *cobra.Command, args []string) error {
@@ -46,7 +100,14 @@ func runPrune(cmd *cobra.Command, args []string) error {
 	// Resolve current worktree path for comparison
 	currentPath := resolvePathBest(cwd)
 
-	var pruneable []git.WorktreeInfo
+	// Optional PR awareness. A missing or unusable gh is the normal case, not
+	// an error: detection just falls back to the git-native checks.
+	var f forge.Forge
+	if remoteURL, err := runner.RemoteURL(ctx, "origin"); err == nil {
+		f = forge.Detect(ctx, remoteURL)
+	}
+
+	var pruneable []prunable
 	for _, wt := range filtered {
 		if wt.Branch == defaultBranch {
 			continue
@@ -56,14 +117,40 @@ func runPrune(cmd *cobra.Command, args []string) error {
 			continue
 		}
 
-		merged, err := runner.IsBranchMerged(ctx, wt.Branch, defaultBranch)
+		status, err := runner.BranchMergeStatus(ctx, wt.Branch, defaultBranch)
 		if err != nil {
 			ui.Warning(fmt.Sprintf("%s: could not check merge status: %s", wt.Branch, err))
 			continue
 		}
 
-		if merged {
-			pruneable = append(pruneable, wt)
+		if status.Merged {
+			pruneable = append(pruneable, prunable{worktree: wt, method: status.Method, reason: mergeReason(status.Method)})
+			continue
+		}
+
+		if f == nil {
+			continue
+		}
+
+		pr, err := f.PRForBranch(ctx, wt.Branch)
+		if err != nil {
+			// One failure usually means gh is unauthenticated or offline, so
+			// stop asking rather than repeating it for every worktree — but say
+			// so, since the remaining worktrees are now judged by git alone.
+			ui.Warning(fmt.Sprintf(
+				"%s: could not check pull request state: %s\n  Pull request detection disabled for the rest of this run.",
+				wt.Branch, err,
+			))
+			f = nil
+			continue
+		}
+
+		if prMerged(ctx, runner, pr, wt, defaultBranch) {
+			pruneable = append(pruneable, prunable{
+				worktree: wt,
+				method:   git.MergeNone,
+				reason:   fmt.Sprintf("merged (PR #%d)", pr.Number),
+			})
 		}
 	}
 
@@ -73,13 +160,15 @@ func runPrune(cmd *cobra.Command, args []string) error {
 	}
 
 	ui.Step("Merged worktrees:")
-	for _, wt := range pruneable {
-		relPath, err := filepath.Rel(projectRoot, wt.Path)
+	t := ui.NewTable().Headers("BRANCH", "PATH", "MERGED")
+	for _, p := range pruneable {
+		relPath, err := filepath.Rel(projectRoot, p.worktree.Path)
 		if err != nil {
-			relPath = wt.Path
+			relPath = p.worktree.Path
 		}
-		fmt.Fprintf(ui.Output, "  %s  %s\n", wt.Branch, relPath)
+		t.Row(p.worktree.Branch, relPath, p.reason)
 	}
+	ui.PrintTable(t)
 
 	force, _ := cmd.Flags().GetBool("force")
 	if !force && !IsDryRun() {
@@ -100,7 +189,8 @@ func runPrune(cmd *cobra.Command, args []string) error {
 	skipTeardown, _ := cmd.Flags().GetBool("skip-teardown")
 
 	var removed int
-	for _, wt := range pruneable {
+	for _, p := range pruneable {
+		wt := p.worktree
 		if !skipTeardown {
 			if err := project.RunTeardownHooks(ctx, cfg, wt.Path, IsDryRun()); err != nil {
 				ui.Warning("Teardown hooks failed for " + wt.Branch + ": " + err.Error())
@@ -116,8 +206,18 @@ func runPrune(cmd *cobra.Command, args []string) error {
 			continue
 		}
 
+		// Only a true ancestor merge satisfies `git branch -d`. For squash and
+		// rebase merges git still calls the branch unmerged, so hand the user
+		// the exact command rather than force-deleting behind their back.
 		if err := runner.BranchDelete(ctx, wt.Branch, false); err != nil {
-			ui.Warning("Could not delete branch: " + err.Error())
+			if p.method == git.MergeAncestor {
+				ui.Warning("Could not delete branch: " + err.Error())
+			} else {
+				ui.Warning(fmt.Sprintf(
+					"Branch %s kept: %s\n  If this is the expected \"not fully merged\" refusal, delete it with: git branch -D %s",
+					wt.Branch, err, wt.Branch,
+				))
+			}
 		}
 
 		removed++
