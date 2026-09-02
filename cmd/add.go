@@ -224,7 +224,8 @@ func runSetupBackground(projectRoot, worktreePath string, cfg *config.Config, dr
 		return fmt.Errorf("cannot find wt binary: %w", err)
 	}
 
-	child := exec.Command(exe, "_run-setup",
+	child := exec.Command(
+		exe, "_run-setup",
 		"--worktree-path", worktreePath,
 		"--project-root", projectRoot,
 	)
