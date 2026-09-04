@@ -108,7 +108,8 @@ After wt init (existing repo):
 
 ### Remove worktrees with merged branches
 
-    wt prune --force                  # Use --force to skip confirmation
+    wt prune --yes                    # Use --yes to skip confirmation
+    wt prune --force --yes            # Also remove merged worktrees with uncommitted changes
 
 ### Preview any command safely
 
@@ -148,7 +149,7 @@ After wt init (existing repo):
 ### Cleaning up after merge
 
     wt sync
-    wt prune --force
+    wt prune --yes
 
 ### Applying shared file changes
 
@@ -201,7 +202,8 @@ Available variables:
    cd "$(wt cd <name>)"
 2. For cloned projects, there is no .git at the project root (bare repo at .bare/).
    For initialized projects, .git exists and the project root is the main worktree.
-3. Use --force with wt remove and wt prune to skip interactive confirmation.
+3. Use --force with wt remove and --yes with wt prune to skip interactive confirmation.
+   wt prune --force removes merged worktrees even when they have uncommitted changes.
 4. Use --dry-run to safely preview any destructive operation.
 5. The project root is identified by .worktree.yml — look for this file.
 6. Run git commands inside the worktree directory, not the project root.

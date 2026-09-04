@@ -220,10 +220,11 @@ Skips dirty worktrees. Shows summary of updated/skipped/failed counts.
 
 ```bash
 wt prune                     # Remove worktrees with merged branches
-wt prune --force             # Skip confirmation
+wt prune --force             # Also remove merged worktrees with uncommitted changes
+wt prune --yes               # Skip confirmation
 ```
 
-Compares branches against the default branch (main/master).
+Compares branches against the default branch (main/master). Detects regular, squash, and rebase merges, plus merged pull requests when `gh` is available. Merged worktrees with uncommitted changes are listed as `dirty` and kept unless you pass `--force`.
 
 ### wt agents
 
