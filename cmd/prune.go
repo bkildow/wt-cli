@@ -17,10 +17,17 @@ func newPruneCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "prune",
 		Short: "Remove worktrees with fully merged branches",
-		Args:  cobra.NoArgs,
-		RunE:  runPrune,
+		Long: `Remove worktrees whose branch has been merged into the default branch.
+
+Detects regular, squash, and rebase merges, plus merged pull requests when
+gh is available. Merged worktrees with uncommitted changes are listed as
+dirty and kept unless --force is given. A confirmation prompt is shown
+before anything is removed; pass --yes to skip it.`,
+		Args: cobra.NoArgs,
+		RunE: runPrune,
 	}
-	cmd.Flags().Bool("force", false, "Skip confirmation prompt")
+	cmd.Flags().Bool("force", false, "Remove merged worktrees even if they have uncommitted changes")
+	cmd.Flags().Bool("yes", false, "Skip confirmation prompt")
 	cmd.Flags().Bool("skip-teardown", false, "Skip running teardown hooks before removing worktrees")
 	return cmd
 }
@@ -31,6 +38,28 @@ type prunable struct {
 	worktree git.WorktreeInfo
 	method   git.MergeMethod
 	reason   string
+	dirty    bool
+}
+
+// status describes the working tree for the candidate listing.
+func (p prunable) status() string {
+	if p.dirty {
+		return "dirty"
+	}
+	return "clean"
+}
+
+// partitionPrunable splits candidates into those prune will remove and those
+// it will keep. Only dirty worktrees are ever kept, and only without --force.
+func partitionPrunable(candidates []prunable, force bool) (remove, keep []prunable) {
+	for _, p := range candidates {
+		if p.dirty && !force {
+			keep = append(keep, p)
+			continue
+		}
+		remove = append(remove, p)
+	}
+	return remove, keep
 }
 
 func mergeReason(method git.MergeMethod) string {
@@ -85,6 +114,10 @@ func runPrune(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	force, _ := cmd.Flags().GetBool("force")
+	yes, _ := cmd.Flags().GetBool("yes")
+	skipTeardown, _ := cmd.Flags().GetBool("skip-teardown")
+
 	cwd, _ := os.Getwd()
 	runner := git.NewRunner(project.GitDirPath(projectRoot, cfg), IsDryRun())
 
@@ -107,6 +140,17 @@ func runPrune(cmd *cobra.Command, args []string) error {
 		f = forge.Detect(ctx, remoteURL)
 	}
 
+	// A worktree's dirtiness decides whether it is removed, so an unanswerable
+	// question is treated as dirty rather than risking uncommitted work.
+	isDirty := func(wt git.WorktreeInfo) bool {
+		dirty, err := runner.IsWorktreeDirty(ctx, wt.Path)
+		if err != nil {
+			ui.Warning(fmt.Sprintf("%s: could not check for uncommitted changes, assuming dirty: %s", wt.Branch, err))
+			return true
+		}
+		return dirty
+	}
+
 	var pruneable []prunable
 	for _, wt := range filtered {
 		if wt.Branch == defaultBranch {
@@ -124,7 +168,12 @@ func runPrune(cmd *cobra.Command, args []string) error {
 		}
 
 		if status.Merged {
-			pruneable = append(pruneable, prunable{worktree: wt, method: status.Method, reason: mergeReason(status.Method)})
+			pruneable = append(pruneable, prunable{
+				worktree: wt,
+				method:   status.Method,
+				reason:   mergeReason(status.Method),
+				dirty:    isDirty(wt),
+			})
 			continue
 		}
 
@@ -150,6 +199,7 @@ func runPrune(cmd *cobra.Command, args []string) error {
 				worktree: wt,
 				method:   git.MergeNone,
 				reason:   fmt.Sprintf("merged (PR #%d)", pr.Number),
+				dirty:    isDirty(wt),
 			})
 		}
 	}
@@ -160,20 +210,32 @@ func runPrune(cmd *cobra.Command, args []string) error {
 	}
 
 	ui.Step("Merged worktrees:")
-	t := ui.NewTable().Headers("BRANCH", "PATH", "MERGED")
+	t := ui.NewTable().Headers("BRANCH", "PATH", "MERGED", "STATUS")
 	for _, p := range pruneable {
 		relPath, err := filepath.Rel(projectRoot, p.worktree.Path)
 		if err != nil {
 			relPath = p.worktree.Path
 		}
-		t.Row(p.worktree.Branch, relPath, p.reason)
+		t.Row(p.worktree.Branch, relPath, p.reason, p.status())
 	}
 	ui.PrintTable(t)
 
-	force, _ := cmd.Flags().GetBool("force")
-	if !force && !IsDryRun() {
+	toRemove, kept := partitionPrunable(pruneable, force)
+	if len(kept) > 0 {
+		ui.Warning(fmt.Sprintf(
+			"%d worktree(s) have uncommitted changes and will be kept. Pass --force to remove them too.",
+			len(kept),
+		))
+	}
+
+	if len(toRemove) == 0 {
+		ui.Info("Nothing to prune.")
+		return nil
+	}
+
+	if !yes && !IsDryRun() {
 		prompter := &ui.InteractivePrompter{}
-		confirmed, err := prompter.Confirm(fmt.Sprintf("Remove %d merged worktree(s)?", len(pruneable)))
+		confirmed, err := prompter.Confirm(fmt.Sprintf("Remove %d merged worktree(s)?", len(toRemove)))
 		if err != nil {
 			if ui.IsUserAbort(err) {
 				return nil
@@ -186,10 +248,8 @@ func runPrune(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	skipTeardown, _ := cmd.Flags().GetBool("skip-teardown")
-
 	var removed int
-	for _, p := range pruneable {
+	for _, p := range toRemove {
 		wt := p.worktree
 		if !skipTeardown {
 			if err := project.RunTeardownHooks(ctx, cfg, wt.Path, IsDryRun()); err != nil {
@@ -201,7 +261,7 @@ func runPrune(cmd *cobra.Command, args []string) error {
 		}
 
 		ui.Step("Removing worktree: " + wt.Branch)
-		if err := runner.WorktreeRemove(ctx, wt.Path, false); err != nil {
+		if err := runner.WorktreeRemove(ctx, wt.Path, force); err != nil {
 			ui.Warning(fmt.Sprintf("Could not remove worktree %s: %s", wt.Branch, err))
 			continue
 		}
@@ -227,6 +287,10 @@ func runPrune(cmd *cobra.Command, args []string) error {
 		ui.Warning("Could not prune worktree metadata: " + err.Error())
 	}
 
-	ui.Success(fmt.Sprintf("Pruned %d worktree(s)", removed))
+	summary := fmt.Sprintf("Pruned %d worktree(s)", removed)
+	if len(kept) > 0 {
+		summary += fmt.Sprintf(", kept %d with uncommitted changes (use --force)", len(kept))
+	}
+	ui.Success(summary)
 	return nil
 }

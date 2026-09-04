@@ -1,0 +1,52 @@
+[!exec:git] skip 'git not available'
+
+# The remote's default branch is master, so point prune at it. `develop` is
+# created at the same commit as master and is therefore already merged.
+setup-repo develop feature
+setup-project
+
+cd $WORK/project
+cp $WORK/config.yml .worktree.yml
+
+exec git --git-dir=.bare worktree add --relative-paths worktrees/develop develop
+exec git --git-dir=.bare worktree add --relative-paths worktrees/feature feature
+
+# Dirty the develop worktree.
+cp $WORK/scratch.txt worktrees/develop/scratch.txt
+
+# Without --force the dirty worktree is listed but kept; the clean one goes.
+exec wt prune --yes
+stderr 'develop.*merged.*dirty'
+stderr 'feature.*merged.*clean'
+stderr 'uncommitted changes and will be kept'
+stderr 'Removing worktree: feature'
+! stderr 'Removing worktree: develop'
+stderr 'Pruned 1 worktree\(s\), kept 1 with uncommitted changes'
+exists worktrees/develop/scratch.txt
+! exists worktrees/feature
+
+# Nothing removable left without --force: no prompt, no removal.
+exec wt prune --yes
+stderr 'Nothing to prune'
+exists worktrees/develop/scratch.txt
+
+# Dry run never removes anything, forced or not.
+exec wt --dry-run prune --force
+stderr 'develop.*merged.*dirty'
+exists worktrees/develop/scratch.txt
+
+# --force removes the dirty merged worktree.
+exec wt prune --force --yes
+stderr 'Removing worktree: develop'
+stderr 'Pruned 1 worktree\(s\)'
+! stderr 'kept'
+! exists worktrees/develop
+
+-- config.yml --
+version: 1
+git_dir: .bare
+worktree_dir: worktrees
+shared_dir: shared
+main_branch: master
+-- scratch.txt --
+uncommitted

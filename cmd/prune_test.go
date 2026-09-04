@@ -82,3 +82,62 @@ func TestMergeReason(t *testing.T) {
 		})
 	}
 }
+
+// TestPartitionPrunable pins the --force contract: dirty merged worktrees are
+// kept unless forced, clean ones are always removed.
+func TestPartitionPrunable(t *testing.T) {
+	clean := prunable{worktree: git.WorktreeInfo{Branch: "clean"}}
+	dirty := prunable{worktree: git.WorktreeInfo{Branch: "dirty"}, dirty: true}
+	candidates := []prunable{clean, dirty}
+
+	tests := []struct {
+		name       string
+		force      bool
+		wantRemove []string
+		wantKeep   []string
+	}{
+		{"without --force dirty is kept", false, []string{"clean"}, []string{"dirty"}},
+		{"with --force everything goes", true, []string{"clean", "dirty"}, nil},
+	}
+
+	branches := func(ps []prunable) []string {
+		var out []string
+		for _, p := range ps {
+			out = append(out, p.worktree.Branch)
+		}
+		return out
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			remove, keep := partitionPrunable(candidates, tt.force)
+			if got := branches(remove); !equalStrings(got, tt.wantRemove) {
+				t.Errorf("remove = %v, want %v", got, tt.wantRemove)
+			}
+			if got := branches(keep); !equalStrings(got, tt.wantKeep) {
+				t.Errorf("keep = %v, want %v", got, tt.wantKeep)
+			}
+		})
+	}
+}
+
+func TestPrunableStatus(t *testing.T) {
+	if got := (prunable{}).status(); got != "clean" {
+		t.Errorf("status() = %q, want clean", got)
+	}
+	if got := (prunable{dirty: true}).status(); got != "dirty" {
+		t.Errorf("status() = %q, want dirty", got)
+	}
+}
+
+func equalStrings(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
