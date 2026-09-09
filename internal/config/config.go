@@ -35,6 +35,7 @@ type Config struct {
 	ParallelSetup    []string `yaml:"parallel_setup,omitempty"`
 	Teardown         []string `yaml:"teardown,omitempty"`
 	ParallelTeardown []string `yaml:"parallel_teardown,omitempty"`
+	PostRemove       []string `yaml:"post_remove,omitempty"`
 	BackgroundSetup  bool     `yaml:"background_setup,omitempty"`
 	Editor           string   `yaml:"editor,omitempty"`
 
@@ -250,6 +251,20 @@ func renderAnnotatedConfig(cfg *Config) string {
 		b.WriteString("# parallel_teardown:\n")
 		b.WriteString("#   - docker compose down\n")
 		b.WriteString("#   - make clean\n")
+	}
+
+	b.WriteString("\n# Commands to run after a worktree directory is already gone\n")
+	b.WriteString("# Used by integrations (e.g. herdr) that delete the checkout before wt can\n")
+	b.WriteString("# run teardown. These run from the project root with WT_PROJECT_ROOT,\n")
+	b.WriteString("# WT_WORKTREE_ID, WT_WORKTREE_PATH and WT_BRANCH_NAME exported.\n")
+	if cfg != nil && len(cfg.PostRemove) > 0 {
+		b.WriteString("post_remove:\n")
+		for _, t := range cfg.PostRemove {
+			fmt.Fprintf(&b, "  - %s\n", yamlQuote(t))
+		}
+	} else {
+		b.WriteString("# post_remove:\n")
+		b.WriteString("#   - docker compose -p \"$WT_WORKTREE_ID\" down -v\n")
 	}
 
 	return b.String()

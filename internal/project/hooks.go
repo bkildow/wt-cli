@@ -45,6 +45,28 @@ func (pw *prefixWriter) flush() {
 	}
 }
 
+// HookEnv returns the WT_* environment variables exported to every hook
+// command. The names mirror the template variables used by shared/copy
+// *.template files so hooks and templates can address the same values.
+func HookEnv(vars TemplateVars) []string {
+	return []string{
+		"WT_PROJECT_ROOT=" + vars.ProjectRoot,
+		"WT_WORKTREE_ID=" + vars.WorktreeID,
+		"WT_WORKTREE_PATH=" + vars.WorktreePath,
+		"WT_BRANCH_NAME=" + vars.BranchName,
+	}
+}
+
+// newHookCmd builds the shell command for a hook running in dir with the
+// WT_* variables appended to the current environment.
+func newHookCmd(ctx context.Context, cmdStr, dir string, vars TemplateVars) *exec.Cmd {
+	cmd := exec.CommandContext(ctx, "sh", "-c", cmdStr)
+	cmd.Dir = dir
+	cmd.Env = append(os.Environ(), HookEnv(vars)...)
+	cmd.Stdin = os.Stdin
+	return cmd
+}
+
 // HookProgressFunc is called after each serial hook completes.
 // index is the 0-based position, cmdStr is the command, err is nil on success.
 type HookProgressFunc func(index int, cmdStr string, err error)
@@ -52,7 +74,7 @@ type HookProgressFunc func(index int, cmdStr string, err error)
 // RunSetupHooks executes each command in cfg.Setup inside the
 // worktree directory. Failures are logged but do not stop subsequent hooks.
 // An optional onProgress callback is called after each hook completes.
-func RunSetupHooks(ctx context.Context, cfg *config.Config, worktreePath string, dryRun bool, onProgress HookProgressFunc) error {
+func RunSetupHooks(ctx context.Context, cfg *config.Config, vars TemplateVars, dryRun bool, onProgress HookProgressFunc) error {
 	if len(cfg.Setup) == 0 {
 		return nil
 	}
@@ -69,9 +91,7 @@ func RunSetupHooks(ctx context.Context, cfg *config.Config, worktreePath string,
 			continue
 		}
 
-		cmd := exec.CommandContext(ctx, "sh", "-c", cmdStr)
-		cmd.Dir = worktreePath
-		cmd.Stdin = os.Stdin
+		cmd := newHookCmd(ctx, cmdStr, vars.WorktreePath, vars)
 		cmd.Stdout = ui.Output
 		cmd.Stderr = ui.Output
 
@@ -97,13 +117,25 @@ func RunSetupHooks(ctx context.Context, cfg *config.Config, worktreePath string,
 
 // RunTeardownHooks executes each command in cfg.Teardown inside the
 // worktree directory. Failures are logged but do not stop subsequent hooks.
-func RunTeardownHooks(ctx context.Context, cfg *config.Config, worktreePath string, dryRun bool) error {
-	if len(cfg.Teardown) == 0 {
+func RunTeardownHooks(ctx context.Context, cfg *config.Config, vars TemplateVars, dryRun bool) error {
+	return runSerialHooks(ctx, cfg.Teardown, vars.WorktreePath, vars, dryRun, "teardown")
+}
+
+// RunPostRemoveHooks executes each command in cfg.PostRemove from the project
+// root: these hooks exist for the case where the worktree directory has
+// already been deleted by an external tool, so they must rely on the WT_*
+// variables rather than the working directory.
+func RunPostRemoveHooks(ctx context.Context, cfg *config.Config, vars TemplateVars, dryRun bool) error {
+	return runSerialHooks(ctx, cfg.PostRemove, vars.ProjectRoot, vars, dryRun, "post_remove")
+}
+
+func runSerialHooks(ctx context.Context, hooks []string, dir string, vars TemplateVars, dryRun bool, label string) error {
+	if len(hooks) == 0 {
 		return nil
 	}
 
 	failCount := 0
-	for _, cmdStr := range cfg.Teardown {
+	for _, cmdStr := range hooks {
 		ui.Step("Running: " + cmdStr)
 
 		if dryRun {
@@ -111,9 +143,7 @@ func RunTeardownHooks(ctx context.Context, cfg *config.Config, worktreePath stri
 			continue
 		}
 
-		cmd := exec.CommandContext(ctx, "sh", "-c", cmdStr)
-		cmd.Dir = worktreePath
-		cmd.Stdin = os.Stdin
+		cmd := newHookCmd(ctx, cmdStr, dir, vars)
 		cmd.Stdout = ui.Output
 		cmd.Stderr = ui.Output
 
@@ -126,24 +156,24 @@ func RunTeardownHooks(ctx context.Context, cfg *config.Config, worktreePath stri
 	}
 
 	if failCount > 0 {
-		return fmt.Errorf("%d teardown hook(s) failed", failCount)
+		return fmt.Errorf("%d %s hook(s) failed", failCount, label)
 	}
 	return nil
 }
 
 // RunParallelSetupHooks executes all commands in cfg.ParallelSetup concurrently
 // inside the worktree directory. All commands run to completion even if some fail.
-func RunParallelSetupHooks(ctx context.Context, cfg *config.Config, worktreePath string, dryRun bool) error {
-	return runParallelHooks(ctx, cfg.ParallelSetup, worktreePath, dryRun, "parallel setup")
+func RunParallelSetupHooks(ctx context.Context, cfg *config.Config, vars TemplateVars, dryRun bool) error {
+	return runParallelHooks(ctx, cfg.ParallelSetup, vars, dryRun, "parallel setup")
 }
 
 // RunParallelTeardownHooks executes all commands in cfg.ParallelTeardown concurrently
 // inside the worktree directory. All commands run to completion even if some fail.
-func RunParallelTeardownHooks(ctx context.Context, cfg *config.Config, worktreePath string, dryRun bool) error {
-	return runParallelHooks(ctx, cfg.ParallelTeardown, worktreePath, dryRun, "parallel teardown")
+func RunParallelTeardownHooks(ctx context.Context, cfg *config.Config, vars TemplateVars, dryRun bool) error {
+	return runParallelHooks(ctx, cfg.ParallelTeardown, vars, dryRun, "parallel teardown")
 }
 
-func runParallelHooks(ctx context.Context, hooks []string, worktreePath string, dryRun bool, label string) error {
+func runParallelHooks(ctx context.Context, hooks []string, vars TemplateVars, dryRun bool, label string) error {
 	if len(hooks) == 0 {
 		return nil
 	}
@@ -170,9 +200,7 @@ func runParallelHooks(ctx context.Context, hooks []string, worktreePath string, 
 			defer wg.Done()
 
 			pw := &prefixWriter{prefix: cmdStr, mu: &outputMu}
-			cmd := exec.CommandContext(ctx, "sh", "-c", cmdStr)
-			cmd.Dir = worktreePath
-			cmd.Stdin = os.Stdin
+			cmd := newHookCmd(ctx, cmdStr, vars.WorktreePath, vars)
 			cmd.Stdout = pw
 			cmd.Stderr = pw
 

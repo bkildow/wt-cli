@@ -1,0 +1,46 @@
+=== 2026-09-09T13:38:53Z event=worktree.created pwd=/Users/briankildow/Code/wt-cli/integrations/herdr
+HERDR_BIN_PATH=/Users/briankildow/.local/bin/herdr
+HERDR_ENV=1
+HERDR_PANE_ID=wX:p1
+HERDR_PLUGIN_CONFIG_DIR=/Users/briankildow/.config/herdr/plugins/config/wt
+HERDR_PLUGIN_CONTEXT_JSON={"workspace_id":"wX","workspace_label":"herdr-hook-probe","workspace_cwd":"/Users/briankildow/.herdr/worktrees/wt-cli/herdr-hook-probe","worktree":{"repo_key":"/Users/briankildow/Code/wt-cli/.git","repo_name":"wt-cli","repo_root":"/Users/briankildow/Code/wt-cli","checkout_path":"/Users/briankildow/.herdr/worktrees/wt-cli/herdr-hook-probe","is_linked_worktree":true},"tab_id":"wX:t1","tab_label":"1","focused_pane_id":"wX:p1","focused_pane_cwd":"/Users/briankildow/.herdr/worktrees/wt-cli/herdr-hook-probe","focused_pane_status":"unknown","invocation_source":"api","correlation_id":"worktree.created"}
+HERDR_PLUGIN_EVENT_JSON={"event":"worktree_created","data":{"type":"worktree_created","workspace":{"workspace_id":"wX","number":3,"label":"herdr-hook-probe","focused":false,"pane_count":1,"tab_count":1,"active_tab_id":"wX:t1","agent_status":"unknown","worktree":{"repo_key":"/Users/briankildow/Code/wt-cli/.git","repo_name":"wt-cli","repo_root":"/Users/briankildow/Code/wt-cli","checkout_path":"/Users/briankildow/.herdr/worktrees/wt-cli/herdr-hook-probe","is_linked_worktree":true}},"worktree":{"path":"/Users/briankildow/.herdr/worktrees/wt-cli/herdr-hook-probe","branch":"herdr-hook-probe","is_bare":false,"is_detached":false,"is_prunable":false,"is_linked_worktree":true,"open_workspace_id":"wX","label":"wt-cli"}}}
+HERDR_PLUGIN_EVENT=worktree.created
+HERDR_PLUGIN_ID=wt
+HERDR_PLUGIN_ROOT=/Users/briankildow/Code/wt-cli/integrations/herdr
+HERDR_PLUGIN_STATE_DIR=/Users/briankildow/.local/state/herdr/plugins/wt
+HERDR_SOCKET_PATH=/Users/briankildow/.config/herdr/herdr.sock
+HERDR_TAB_ID=wX:t1
+HERDR_WORKSPACE_ID=wX
+--- EVENT_JSON
+{"event":"worktree_created","data":{"type":"worktree_created","workspace":{"workspace_id":"wX","number":3,"label":"herdr-hook-probe","focused":false,"pane_count":1,"tab_count":1,"active_tab_id":"wX:t1","agent_status":"unknown","worktree":{"repo_key":"/Users/briankildow/Code/wt-cli/.git","repo_name":"wt-cli","repo_root":"/Users/briankildow/Code/wt-cli","checkout_path":"/Users/briankildow/.herdr/worktrees/wt-cli/herdr-hook-probe","is_linked_worktree":true}},"worktree":{"path":"/Users/briankildow/.herdr/worktrees/wt-cli/herdr-hook-probe","branch":"herdr-hook-probe","is_bare":false,"is_detached":false,"is_prunable":false,"is_linked_worktree":true,"open_workspace_id":"wX","label":"wt-cli"}}}
+--- CONTEXT_JSON
+{"workspace_id":"wX","workspace_label":"herdr-hook-probe","workspace_cwd":"/Users/briankildow/.herdr/worktrees/wt-cli/herdr-hook-probe","worktree":{"repo_key":"/Users/briankildow/Code/wt-cli/.git","repo_name":"wt-cli","repo_root":"/Users/briankildow/Code/wt-cli","checkout_path":"/Users/briankildow/.herdr/worktrees/wt-cli/herdr-hook-probe","is_linked_worktree":true},"tab_id":"wX:t1","tab_label":"1","focused_pane_id":"wX:p1","focused_pane_cwd":"/Users/briankildow/.herdr/worktrees/wt-cli/herdr-hook-probe","focused_pane_status":"unknown","invocation_source":"api","correlation_id":"worktree.created"}
+
+=== 2026-09-09T13:41:43Z event=worktree.opened pwd=/Users/briankildow/Code/wt-cli/integrations/herdr
+HERDR_BIN_PATH=/Users/briankildow/.local/bin/herdr
+HERDR_ENV=1
+HERDR_PANE_ID=wX:p1
+HERDR_PLUGIN_CONFIG_DIR=/Users/briankildow/.config/herdr/plugins/config/wt
+HERDR_PLUGIN_CONTEXT_JSON={"workspace_id":"wX","workspace_label":"herdr-hook-probe","workspace_cwd":"/Users/briankildow/.herdr/worktrees/wt-cli/herdr-hook-probe","worktree":{"repo_key":"/Users/briankildow/Code/wt-cli/.git","repo_name":"wt-cli","repo_root":"/Users/briankildow/Code/wt-cli","checkout_path":"/Users/briankildow/.herdr/worktrees/wt-cli/herdr-hook-probe","is_linked_worktree":true},"tab_id":"wX:t1","tab_label":"1","focused_pane_id":"wX:p1","focused_pane_cwd":"/Users/briankildow/.herdr/worktrees/wt-cli/herdr-hook-probe","focused_pane_status":"unknown","invocation_source":"api","correlation_id":"worktree.opened"}
+HERDR_PLUGIN_EVENT_JSON={"event":"worktree_opened","data":{"type":"worktree_opened","workspace":{"workspace_id":"wX","number":3,"label":"herdr-hook-probe","focused":false,"pane_count":1,"tab_count":1,"active_tab_id":"wX:t1","agent_status":"unknown","worktree":{"repo_key":"/Users/briankildow/Code/wt-cli/.git","repo_name":"wt-cli","repo_root":"/Users/briankildow/Code/wt-cli","checkout_path":"/Users/briankildow/.herdr/worktrees/wt-cli/herdr-hook-probe","is_linked_worktree":true}},"worktree":{"path":"/Users/briankildow/.herdr/worktrees/wt-cli/herdr-hook-probe","branch":"herdr-hook-probe","is_bare":false,"is_detached":false,"is_prunable":false,"is_linked_worktree":true,"open_workspace_id":"wX","label":"wt-cli"},"already_open":true}}
+HERDR_PLUGIN_EVENT=worktree.opened
+HERDR_PLUGIN_ID=wt
+HERDR_PLUGIN_ROOT=/Users/briankildow/Code/wt-cli/integrations/herdr
+HERDR_PLUGIN_STATE_DIR=/Users/briankildow/.local/state/herdr/plugins/wt
+HERDR_SOCKET_PATH=/Users/briankildow/.config/herdr/herdr.sock
+HERDR_TAB_ID=wX:t1
+HERDR_WORKSPACE_ID=wX
+--- EVENT_JSON
+{"event":"worktree_opened","data":{"type":"worktree_opened","workspace":{"workspace_id":"wX","number":3,"label":"herdr-hook-probe","focused":false,"pane_count":1,"tab_count":1,"active_tab_id":"wX:t1","agent_status":"unknown","worktree":{"repo_key":"/Users/briankildow/Code/wt-cli/.git","repo_name":"wt-cli","repo_root":"/Users/briankildow/Code/wt-cli","checkout_path":"/Users/briankildow/.herdr/worktrees/wt-cli/herdr-hook-probe","is_linked_worktree":true}},"worktree":{"path":"/Users/briankildow/.herdr/worktrees/wt-cli/herdr-hook-probe","branch":"herdr-hook-probe","is_bare":false,"is_detached":false,"is_prunable":false,"is_linked_worktree":true,"open_workspace_id":"wX","label":"wt-cli"},"already_open":true}}
+--- CONTEXT_JSON
+{"workspace_id":"wX","workspace_label":"herdr-hook-probe","workspace_cwd":"/Users/briankildow/.herdr/worktrees/wt-cli/herdr-hook-probe","worktree":{"repo_key":"/Users/briankildow/Code/wt-cli/.git","repo_name":"wt-cli","repo_root":"/Users/briankildow/Code/wt-cli","checkout_path":"/Users/briankildow/.herdr/worktrees/wt-cli/herdr-hook-probe","is_linked_worktree":true},"tab_id":"wX:t1","tab_label":"1","focused_pane_id":"wX:p1","focused_pane_cwd":"/Users/briankildow/.herdr/worktrees/wt-cli/herdr-hook-probe","focused_pane_status":"unknown","invocation_source":"api","correlation_id":"worktree.opened"}
+
+=== 2026-09-09T13:41:45Z event=worktree.removed pwd=/Users/briankildow/Code/wt-cli/integrations/herdr
+path=/Users/briankildow/.herdr/worktrees/wt-cli/herdr-hook-probe exists=no
+git-worktree-list-has-path=0
+--- EVENT_JSON
+{"event":"worktree_removed","data":{"type":"worktree_removed","workspace_id":"wX","workspace":{"workspace_id":"wX","number":3,"label":"herdr-hook-probe","focused":false,"pane_count":1,"tab_count":1,"active_tab_id":"wX:t1","agent_status":"unknown","worktree":{"repo_key":"/Users/briankildow/Code/wt-cli/.git","repo_name":"wt-cli","repo_root":"/Users/briankildow/Code/wt-cli","checkout_path":"/Users/briankildow/.herdr/worktrees/wt-cli/herdr-hook-probe","is_linked_worktree":true}},"worktree":{"path":"/Users/briankildow/.herdr/worktrees/wt-cli/herdr-hook-probe","branch":"herdr-hook-probe","is_bare":false,"is_detached":false,"is_prunable":false,"is_linked_worktree":true,"label":"wt-cli"},"forced":false}}
+--- CONTEXT_JSON
+{"workspace_id":"wX","workspace_label":"herdr-hook-probe","workspace_cwd":"/Users/briankildow/.herdr/worktrees/wt-cli/herdr-hook-probe","worktree":{"repo_key":"/Users/briankildow/Code/wt-cli/.git","repo_name":"wt-cli","repo_root":"/Users/briankildow/Code/wt-cli","checkout_path":"/Users/briankildow/.herdr/worktrees/wt-cli/herdr-hook-probe","is_linked_worktree":true},"tab_id":"wX:t1","invocation_source":"api","correlation_id":"worktree.removed"}
+
