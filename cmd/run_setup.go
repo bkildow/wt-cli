@@ -25,16 +25,19 @@ func newRunSetupCmd() *cobra.Command {
 	}
 	cmd.Flags().String("worktree-path", "", "Path to the worktree")
 	cmd.Flags().String("project-root", "", "Path to the project root")
+	cmd.Flags().String("branch", "", "Branch checked out in the worktree")
 	return cmd
 }
 
 func runRunSetup(cmd *cobra.Command, _ []string) error {
 	worktreePath, _ := cmd.Flags().GetString("worktree-path")
 	projectRoot, _ := cmd.Flags().GetString("project-root")
+	branch, _ := cmd.Flags().GetString("branch")
 
 	if worktreePath == "" || projectRoot == "" {
 		return fmt.Errorf("--worktree-path and --project-root are required")
 	}
+	vars := project.NewTemplateVars(projectRoot, worktreePath, branch)
 
 	// Cancel context on SIGTERM/SIGINT so running hooks are stopped.
 	ctx, stop := signal.NotifyContext(cmd.Context(), syscall.SIGTERM, syscall.SIGINT)
@@ -87,10 +90,10 @@ func runRunSetup(cmd *cobra.Command, _ []string) error {
 		state.HooksCompleted = index + 1
 		_ = project.WriteSetupState(worktreePath, state)
 	}
-	setupErr = project.RunSetupHooks(ctx, cfg, worktreePath, false, onProgress)
+	setupErr = project.RunSetupHooks(ctx, cfg, vars, false, onProgress)
 
 	// Run parallel hooks as a batch.
-	if pErr := project.RunParallelSetupHooks(ctx, cfg, worktreePath, false); pErr != nil {
+	if pErr := project.RunParallelSetupHooks(ctx, cfg, vars, false); pErr != nil {
 		setupErr = errors.Join(setupErr, pErr)
 	}
 	state.HooksCompleted = hooksTotal

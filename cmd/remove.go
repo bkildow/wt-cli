@@ -82,10 +82,11 @@ func runRemove(cmd *cobra.Command, args []string) error {
 
 	skipTeardown, _ := cmd.Flags().GetBool("skip-teardown")
 	if !skipTeardown {
-		if err := project.RunTeardownHooks(ctx, cfg, selected.Path, IsDryRun()); err != nil {
+		vars := project.NewTemplateVars(projectRoot, selected.Path, selected.Branch)
+		if err := project.RunTeardownHooks(ctx, cfg, vars, IsDryRun()); err != nil {
 			ui.Warning("Teardown hooks failed: " + err.Error())
 		}
-		if err := project.RunParallelTeardownHooks(ctx, cfg, selected.Path, IsDryRun()); err != nil {
+		if err := project.RunParallelTeardownHooks(ctx, cfg, vars, IsDryRun()); err != nil {
 			ui.Warning("Parallel teardown hooks failed: " + err.Error())
 		}
 	}

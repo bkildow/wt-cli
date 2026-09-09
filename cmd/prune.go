@@ -252,10 +252,11 @@ func runPrune(cmd *cobra.Command, args []string) error {
 	for _, p := range toRemove {
 		wt := p.worktree
 		if !skipTeardown {
-			if err := project.RunTeardownHooks(ctx, cfg, wt.Path, IsDryRun()); err != nil {
+			vars := project.NewTemplateVars(projectRoot, wt.Path, wt.Branch)
+			if err := project.RunTeardownHooks(ctx, cfg, vars, IsDryRun()); err != nil {
 				ui.Warning("Teardown hooks failed for " + wt.Branch + ": " + err.Error())
 			}
-			if err := project.RunParallelTeardownHooks(ctx, cfg, wt.Path, IsDryRun()); err != nil {
+			if err := project.RunParallelTeardownHooks(ctx, cfg, vars, IsDryRun()); err != nil {
 				ui.Warning("Parallel teardown hooks failed for " + wt.Branch + ": " + err.Error())
 			}
 		}

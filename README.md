@@ -24,6 +24,7 @@
 - **Interactive by default** — branch/worktree pickers when arguments are omitted
 - **Setup/teardown hooks** — run commands automatically when creating or removing worktrees
 - **Claude Code integration** — automatic worktree creation/removal via Claude Code hooks
+- **herdr integration** — worktrees created from herdr get shared files and setup/teardown hooks
 - **Editor integration** — open worktrees in your preferred editor ($EDITOR, config, or auto-detect)
 - **Shell completions** — tab-complete worktree names in bash, zsh, and fish
 - **Dry-run support** — preview every destructive operation with `--dry-run`
@@ -104,6 +105,7 @@ wt prune
 | `wt prune` | Remove worktrees with fully merged branches |
 | `wt config init` | Generate annotated `.worktree.yml` with documentation |
 | `wt claude init` | Configure Claude Code hooks for automatic worktree management |
+| `wt herdr init` | Install the wt plugin into herdr so its worktrees run wt setup/teardown |
 | `wt agents` | Print AI agent workflow instructions |
 | `wt shell-init <shell>` | Print shell startup config (wrapper + completions) |
 | `wt completion <shell>` | Generate shell completion script |
@@ -250,6 +252,21 @@ This enables two hooks:
 
 Run `wt claude init` once per project. The hooks propagate to all worktrees automatically.
 
+### wt herdr init
+
+```bash
+wt herdr init                      # Write the plugin manifest and link it with herdr
+wt herdr init --binary /path/to/wt # Pin a specific wt binary in the manifest
+wt herdr init --no-link            # Write the manifest only
+```
+
+Installs a global [herdr](https://herdr.dev) plugin so worktrees created from herdr's sidebar (or `herdr worktree create`) behave like ones created with `wt add`. herdr keeps ownership of the checkout, which lives in its own directory (`~/.herdr/worktrees/<repo>/<branch>` by default); wt reacts to herdr's events:
+
+- **worktree.created** — `wt` applies shared files to the new checkout and runs setup hooks
+- **worktree.removed** — herdr has already deleted the checkout when this fires, so ordinary `teardown` hooks (which run inside the worktree) are skipped with a warning. Add `post_remove` hooks for this case: they run from the project root with `WT_PROJECT_ROOT`, `WT_WORKTREE_ID`, `WT_WORKTREE_PATH`, and `WT_BRANCH_NAME` exported, for example `docker compose -p "$WT_WORKTREE_ID" down -v`. A setup still running for that worktree is stopped first.
+
+Run `wt herdr init` once per machine. The plugin ignores repos without a `.worktree.yml`. Hook output is available via `herdr plugin log list --plugin wt`. See `integrations/herdr/README.md` for details on the event payloads.
+
 ### wt completion
 
 ```bash
@@ -327,6 +344,25 @@ Hooks run in the worktree directory via `sh -c`. Serial hooks (`setup`/`teardown
 - **Setup hooks** run after worktree creation and shared file application. If any hook fails, `wt add` reports the error (the worktree is still created).
 - **Teardown hooks** run before worktree removal. Hook failures are logged as warnings and do not prevent removal.
 - Both respect `--dry-run` (prints what would run without executing).
+
+### Hook Environment Variables
+
+Every hook (`setup`, `parallel_setup`, `teardown`, `parallel_teardown`, `post_remove`) runs with these variables exported, in addition to the normal environment:
+
+| Variable | Example (branch: `feature/Auth`) |
+|----------|----------------------------------|
+| `WT_PROJECT_ROOT` | `/path/to/project` |
+| `WT_WORKTREE_ID` | `feature-auth` |
+| `WT_WORKTREE_PATH` | `/path/to/project/worktrees/feature/Auth` |
+| `WT_BRANCH_NAME` | `feature/Auth` |
+
+They mirror the [template variables](#template-variables), so a hook can address the same resources a `.template` file does, e.g. `docker compose -p "$WT_WORKTREE_ID" up -d`.
+
+### Post-Remove Hooks
+
+`post_remove` hooks cover the case where the worktree directory is already gone before `wt` gets to run teardown (today: worktrees removed through herdr). They run serially from the **project root**, not the worktree, with the same `WT_*` variables exported; `WT_WORKTREE_PATH` names a directory that no longer exists, so use it only to derive names, e.g. `ddev delete -Oy "$(basename "$WT_WORKTREE_PATH")"`.
+
+`wt remove` and `wt prune` do not run `post_remove`; they run `teardown` while the directory still exists.
 
 ### Parallel Hooks
 

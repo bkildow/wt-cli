@@ -149,10 +149,10 @@ func runAdd(cmd *cobra.Command, args []string) error {
 	}
 
 	if background {
-		return runSetupBackground(projectRoot, worktreePath, cfg, dry, msg)
+		return runSetupBackground(vars, cfg, dry, msg)
 	}
 
-	return runSetupForeground(cmd, worktreePath, cfg, dry, msg)
+	return runSetupForeground(cmd, vars, cfg, dry, msg)
 }
 
 // resolveBackgroundMode determines whether setup should run in background.
@@ -172,13 +172,14 @@ func resolveBackgroundMode(cmd *cobra.Command, cfg *config.Config) (bool, error)
 	return cfg.BackgroundSetup, nil
 }
 
-func runSetupForeground(cmd *cobra.Command, worktreePath string, cfg *config.Config, dry bool, msg string) error {
+func runSetupForeground(cmd *cobra.Command, vars project.TemplateVars, cfg *config.Config, dry bool, msg string) error {
 	ctx := cmd.Context()
+	worktreePath := vars.WorktreePath
 	startedAt := time.Now()
 
 	var setupErr error
-	setupErr = project.RunSetupHooks(ctx, cfg, worktreePath, dry, nil)
-	if pErr := project.RunParallelSetupHooks(ctx, cfg, worktreePath, dry); pErr != nil {
+	setupErr = project.RunSetupHooks(ctx, cfg, vars, dry, nil)
+	if pErr := project.RunParallelSetupHooks(ctx, cfg, vars, dry); pErr != nil {
 		setupErr = errors.Join(setupErr, pErr)
 	}
 
@@ -209,7 +210,8 @@ func runSetupForeground(cmd *cobra.Command, worktreePath string, cfg *config.Con
 	return nil
 }
 
-func runSetupBackground(projectRoot, worktreePath string, cfg *config.Config, dry bool, msg string) error {
+func runSetupBackground(vars project.TemplateVars, cfg *config.Config, dry bool, msg string) error {
+	projectRoot, worktreePath := vars.ProjectRoot, vars.WorktreePath
 	hooksTotal := len(cfg.Setup) + len(cfg.ParallelSetup)
 
 	if dry {
@@ -228,6 +230,7 @@ func runSetupBackground(projectRoot, worktreePath string, cfg *config.Config, dr
 		exe, "_run-setup",
 		"--worktree-path", worktreePath,
 		"--project-root", projectRoot,
+		"--branch", vars.BranchName,
 	)
 	detachProcess(child)
 

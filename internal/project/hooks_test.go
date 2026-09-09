@@ -15,7 +15,7 @@ func TestRunSetupHooks(t *testing.T) {
 	}
 	wt := t.TempDir()
 
-	err := RunSetupHooks(context.Background(), cfg, wt, false, nil)
+	err := RunSetupHooks(context.Background(), cfg, NewTemplateVars(wt, wt, "test"), false, nil)
 	if err != nil {
 		t.Fatalf("RunSetupHooks error: %v", err)
 	}
@@ -27,7 +27,7 @@ func TestRunSetupHooksDryRun(t *testing.T) {
 	}
 	wt := t.TempDir()
 
-	err := RunSetupHooks(context.Background(), cfg, wt, true, nil)
+	err := RunSetupHooks(context.Background(), cfg, NewTemplateVars(wt, wt, "test"), true, nil)
 	if err != nil {
 		t.Fatalf("RunSetupHooks dry-run error: %v", err)
 	}
@@ -39,7 +39,7 @@ func TestRunSetupHooksFailure(t *testing.T) {
 	}
 	wt := t.TempDir()
 
-	err := RunSetupHooks(context.Background(), cfg, wt, false, nil)
+	err := RunSetupHooks(context.Background(), cfg, NewTemplateVars(wt, wt, "test"), false, nil)
 	if err == nil {
 		t.Fatal("expected error from failing hook")
 	}
@@ -49,7 +49,7 @@ func TestRunSetupHooksEmpty(t *testing.T) {
 	cfg := &config.Config{}
 	wt := t.TempDir()
 
-	err := RunSetupHooks(context.Background(), cfg, wt, false, nil)
+	err := RunSetupHooks(context.Background(), cfg, NewTemplateVars(wt, wt, "test"), false, nil)
 	if err != nil {
 		t.Fatalf("RunSetupHooks with empty hooks error: %v", err)
 	}
@@ -61,7 +61,7 @@ func TestRunSetupHooksContinuesOnFailure(t *testing.T) {
 	}
 	wt := t.TempDir()
 
-	err := RunSetupHooks(context.Background(), cfg, wt, false, nil)
+	err := RunSetupHooks(context.Background(), cfg, NewTemplateVars(wt, wt, "test"), false, nil)
 	if err == nil {
 		t.Fatal("expected error from failing hook")
 	}
@@ -73,7 +73,7 @@ func TestRunTeardownHooks(t *testing.T) {
 	}
 	wt := t.TempDir()
 
-	err := RunTeardownHooks(context.Background(), cfg, wt, false)
+	err := RunTeardownHooks(context.Background(), cfg, NewTemplateVars(wt, wt, "test"), false)
 	if err != nil {
 		t.Fatalf("RunTeardownHooks error: %v", err)
 	}
@@ -83,7 +83,7 @@ func TestRunTeardownHooksEmpty(t *testing.T) {
 	cfg := &config.Config{}
 	wt := t.TempDir()
 
-	err := RunTeardownHooks(context.Background(), cfg, wt, false)
+	err := RunTeardownHooks(context.Background(), cfg, NewTemplateVars(wt, wt, "test"), false)
 	if err != nil {
 		t.Fatalf("RunTeardownHooks with empty hooks error: %v", err)
 	}
@@ -95,7 +95,7 @@ func TestRunTeardownHooksFailure(t *testing.T) {
 	}
 	wt := t.TempDir()
 
-	err := RunTeardownHooks(context.Background(), cfg, wt, false)
+	err := RunTeardownHooks(context.Background(), cfg, NewTemplateVars(wt, wt, "test"), false)
 	if err == nil {
 		t.Fatal("expected error from failing teardown hook")
 	}
@@ -110,7 +110,7 @@ func TestRunParallelSetupHooks(t *testing.T) {
 		},
 	}
 
-	err := RunParallelSetupHooks(context.Background(), cfg, wt, false)
+	err := RunParallelSetupHooks(context.Background(), cfg, NewTemplateVars(wt, wt, "test"), false)
 	if err != nil {
 		t.Fatalf("RunParallelSetupHooks error: %v", err)
 	}
@@ -122,7 +122,7 @@ func TestRunParallelSetupHooksDryRun(t *testing.T) {
 		ParallelSetup: []string{"echo hello", "echo world"},
 	}
 
-	err := RunParallelSetupHooks(context.Background(), cfg, wt, true)
+	err := RunParallelSetupHooks(context.Background(), cfg, NewTemplateVars(wt, wt, "test"), true)
 	if err != nil {
 		t.Fatalf("RunParallelSetupHooks dry-run error: %v", err)
 	}
@@ -132,7 +132,7 @@ func TestRunParallelSetupHooksEmpty(t *testing.T) {
 	wt := t.TempDir()
 	cfg := &config.Config{}
 
-	err := RunParallelSetupHooks(context.Background(), cfg, wt, false)
+	err := RunParallelSetupHooks(context.Background(), cfg, NewTemplateVars(wt, wt, "test"), false)
 	if err != nil {
 		t.Fatalf("RunParallelSetupHooks with empty hooks error: %v", err)
 	}
@@ -144,7 +144,7 @@ func TestRunParallelSetupHooksFailure(t *testing.T) {
 		ParallelSetup: []string{"echo ok", "false", "echo still-runs"},
 	}
 
-	err := RunParallelSetupHooks(context.Background(), cfg, wt, false)
+	err := RunParallelSetupHooks(context.Background(), cfg, NewTemplateVars(wt, wt, "test"), false)
 	if err == nil {
 		t.Fatal("expected error from failing parallel setup hook")
 	}
@@ -161,7 +161,7 @@ func TestRunParallelSetupHooksConcurrency(t *testing.T) {
 		},
 	}
 
-	err := RunParallelSetupHooks(context.Background(), cfg, wt, false)
+	err := RunParallelSetupHooks(context.Background(), cfg, NewTemplateVars(wt, wt, "test"), false)
 	if err != nil {
 		t.Fatalf("RunParallelSetupHooks error: %v", err)
 	}
@@ -179,7 +179,7 @@ func TestRunParallelTeardownHooks(t *testing.T) {
 		ParallelTeardown: []string{"echo cleanup1", "echo cleanup2"},
 	}
 
-	err := RunParallelTeardownHooks(context.Background(), cfg, wt, false)
+	err := RunParallelTeardownHooks(context.Background(), cfg, NewTemplateVars(wt, wt, "test"), false)
 	if err != nil {
 		t.Fatalf("RunParallelTeardownHooks error: %v", err)
 	}
@@ -191,8 +191,45 @@ func TestRunParallelTeardownHooksFailure(t *testing.T) {
 		ParallelTeardown: []string{"echo ok", "false"},
 	}
 
-	err := RunParallelTeardownHooks(context.Background(), cfg, wt, false)
+	err := RunParallelTeardownHooks(context.Background(), cfg, NewTemplateVars(wt, wt, "test"), false)
 	if err == nil {
 		t.Fatal("expected error from failing parallel teardown hook")
+	}
+}
+
+func TestHooksReceiveWTEnv(t *testing.T) {
+	root := t.TempDir()
+	wt := filepath.Join(root, "worktrees", "feature", "Auth")
+	if err := os.MkdirAll(wt, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	out := filepath.Join(root, "env.txt")
+	cfg := &config.Config{
+		Setup:            []string{`echo "$WT_PROJECT_ROOT|$WT_WORKTREE_ID|$WT_WORKTREE_PATH|$WT_BRANCH_NAME|$(pwd)" > ` + out},
+		ParallelTeardown: []string{`echo "$WT_WORKTREE_ID" >> ` + out},
+		PostRemove:       []string{`echo "post:$(pwd)" >> ` + out},
+	}
+	vars := NewTemplateVars(root, wt, "feature/Auth")
+
+	if err := RunSetupHooks(context.Background(), cfg, vars, false, nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := RunParallelTeardownHooks(context.Background(), cfg, vars, false); err != nil {
+		t.Fatal(err)
+	}
+	if err := RunPostRemoveHooks(context.Background(), cfg, vars, false); err != nil {
+		t.Fatal(err)
+	}
+
+	data, err := os.ReadFile(out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := string(data)
+	realWt, _ := filepath.EvalSymlinks(wt)
+	realRoot, _ := filepath.EvalSymlinks(root)
+	want := root + "|feature-auth|" + wt + "|feature/Auth|" + realWt + "\nfeature-auth\npost:" + realRoot + "\n"
+	if got != want {
+		t.Errorf("hook env mismatch\n got: %q\nwant: %q", got, want)
 	}
 }

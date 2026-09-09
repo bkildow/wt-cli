@@ -69,8 +69,9 @@ func runSetup(cmd *cobra.Command, args []string) error {
 	}
 
 	msg := "Running setup for: " + selected.Branch
+	vars := project.NewTemplateVars(projectRoot, selected.Path, selected.Branch)
 	if background {
-		return runSetupBackground(projectRoot, selected.Path, cfg, dry, msg)
+		return runSetupBackground(vars, cfg, dry, msg)
 	}
-	return runSetupForeground(cmd, selected.Path, cfg, dry, msg)
+	return runSetupForeground(cmd, vars, cfg, dry, msg)
 }
