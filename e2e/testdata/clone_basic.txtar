@@ -12,7 +12,14 @@ exists myproject/.bare
 exists myproject/shared/copy
 exists myproject/shared/symlink
 exists myproject/worktrees
+exists myproject/bin/refresh
 
 # Verify config
 grep 'version: 1' myproject/.worktree.yml
 grep 'git_dir: .bare' myproject/.worktree.yml
+grep 'refresh: bin/refresh' myproject/.worktree.yml
+
+# The starter refresh script is a runnable no-op.
+cd myproject
+exec wt run refresh
+stderr 'not implemented'

@@ -98,15 +98,19 @@ func TestRunScriptArgsEnvAndCwd(t *testing.T) {
 		t.Fatal(err)
 	}
 	script := filepath.Join(root, "bin", "probe")
-	writeScript(t, script, `printf '%s\n' "$(pwd)" "$WT_SCRIPT_NAME" "$WT_PROJECT_ROOT" "$WT_WORKTREE_PATH" "$WT_WORKTREE_ID" "$WT_BRANCH_NAME" "$#" "$1" "$2" > out.txt
+	writeScript(t, script, `printf '%s\n' "$(pwd)" "$WT_SCRIPT_NAME" "$WT_PROJECT_ROOT" "$WT_WORKTREE_PATH" "$WT_WORKTREE_ID" "$WT_BRANCH_NAME" "$WT_SHARED_PATH" "$WT_MAIN_BRANCH" "$WT_MAIN_WORKTREE_PATH" "$#" "$1" "$2" > out.txt
 `, 0o755)
 
+	mainWT := filepath.Join(root, "worktrees", "main")
 	err := RunScript(context.Background(), ScriptRun{
-		Name: "probe",
-		Path: script,
-		Args: []string{"--flag", "value with space"},
-		Dir:  wt,
-		Vars: NewTemplateVars(root, wt, "feature/x"),
+		Name:             "probe",
+		Path:             script,
+		Args:             []string{"--flag", "value with space"},
+		Dir:              wt,
+		Vars:             NewTemplateVars(root, wt, "feature/x"),
+		SharedPath:       filepath.Join(root, "shared"),
+		MainBranch:       "main",
+		MainWorktreePath: mainWT,
 	}, false)
 	if err != nil {
 		t.Fatalf("RunScript error: %v", err)
@@ -117,7 +121,7 @@ func TestRunScriptArgsEnvAndCwd(t *testing.T) {
 		t.Fatalf("script did not write in cwd: %v", err)
 	}
 	lines := strings.Split(strings.TrimRight(string(data), "\n"), "\n")
-	want := []string{wt, "probe", filepath.Clean(root), wt, "feature-x", "feature/x", "2", "--flag", "value with space"}
+	want := []string{wt, "probe", filepath.Clean(root), wt, "feature-x", "feature/x", filepath.Join(root, "shared"), "main", mainWT, "2", "--flag", "value with space"}
 	if len(lines) != len(want) {
 		t.Fatalf("got %d lines %q, want %d", len(lines), lines, len(want))
 	}

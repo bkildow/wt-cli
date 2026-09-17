@@ -78,6 +78,7 @@ func TestCreateScaffold(t *testing.T) {
 		filepath.Join(root, "shared", "copy"),
 		filepath.Join(root, "shared", "symlink"),
 		filepath.Join(root, "worktrees"),
+		filepath.Join(root, "bin"),
 	}
 
 	for _, dir := range dirs {
@@ -153,5 +154,25 @@ func TestCreateScaffoldCustomDir(t *testing.T) {
 	// Default "worktrees" should NOT exist
 	if _, err := os.Stat(filepath.Join(root, "worktrees")); err == nil {
 		t.Error("default 'worktrees' dir should not be created when custom dir is set")
+	}
+}
+
+func TestBinPath(t *testing.T) {
+	tests := []struct {
+		name      string
+		sharedDir string
+		want      string
+	}{
+		{"clone layout", "shared", "/p/bin"},
+		{"init layout", ".worktrees/shared", "/p/.worktrees/bin"},
+		{"nested custom", "infra/wt/shared", "/p/infra/wt/bin"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := BinPath("/p", &config.Config{SharedDir: tt.sharedDir})
+			if got != filepath.FromSlash(tt.want) {
+				t.Errorf("BinPath = %q, want %q", got, tt.want)
+			}
+		})
 	}
 }

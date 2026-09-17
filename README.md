@@ -184,11 +184,23 @@ variables are exported:
 |----------|-------|
 | `WT_SCRIPT_NAME` | Name of the script being run |
 | `WT_PROJECT_ROOT` | Absolute project root |
+| `WT_SHARED_PATH` | Absolute shared directory (`copy/` and `symlink/` live here) |
+| `WT_MAIN_BRANCH` | `main_branch` from `.worktree.yml` |
+| `WT_MAIN_WORKTREE_PATH` | Worktree checked out on the main branch (empty if none) |
 | `WT_WORKTREE_PATH` | Absolute path of the current worktree (empty outside a worktree) |
 | `WT_WORKTREE_ID` | Branch lowercased, `/` → `-` (empty outside a worktree) |
 | `WT_BRANCH_NAME` | Branch of the current worktree (empty outside a worktree) |
 
 A non-zero exit from the script is reported as an error.
+
+**Starter refresh script.** `wt clone` and `wt init` create `bin/refresh`
+(`.worktrees/bin/refresh` for `wt init`) and register it as `scripts.refresh`.
+It is a no-op that prints a message, but its comments lay out the typical
+shape of an environment refresh: work in the main worktree via
+`WT_MAIN_WORKTREE_PATH`, start services, pull, refresh data, capture a
+snapshot, and publish it under `WT_SHARED_PATH/copy` so new worktrees inherit
+it. Fill in the steps for your stack, or point an AI agent at the file and ask
+it to.
 
 ### wt cd
 
@@ -295,6 +307,8 @@ wt completion fish > ~/.config/fish/completions/wt.fish
 project/
 ├── .bare/                   # Bare git repository (no working tree)
 ├── .worktree.yml            # Project configuration
+├── bin/
+│   └── refresh              # Starter script for `wt run refresh`
 ├── shared/
 │   ├── copy/                # Files copied into each worktree
 │   │   └── .env.example     # Supports ${TEMPLATE_VARS}
