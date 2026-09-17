@@ -60,6 +60,10 @@ func runInit(cmd *cobra.Command, args []string) error {
 	if err := project.CreateScaffold(projectRoot, &cfg, dry); err != nil {
 		return err
 	}
+	if err := project.WriteStarterScripts(projectRoot, &cfg, dry); err != nil {
+		return err
+	}
+	cfg.Scripts = project.StarterScripts(projectRoot, &cfg)
 
 	// Configure local git excludes for wt-managed files
 	ui.Step("Configuring local git excludes")
@@ -80,6 +84,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 	ui.Success("Initialized wt project in: " + projectRoot)
 	ui.Info("  Your existing checkout is the main worktree.")
 	ui.Info("  Use 'wt add <branch>' to create additional worktrees.")
+	ui.Info("  A starter 'wt run refresh' script was written to .worktrees/bin/refresh.")
 	ui.Info("")
 	ui.Info("  Consider adding to .gitignore:")
 	ui.Info("    .worktrees/")

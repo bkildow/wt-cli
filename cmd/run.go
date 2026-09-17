@@ -23,11 +23,14 @@ Script paths are resolved relative to the project root (absolute paths are
 allowed). The script runs with the current worktree as its working directory
 and receives these environment variables:
 
-  WT_SCRIPT_NAME    Name of the script being run
-  WT_PROJECT_ROOT   Project root (where .worktree.yml lives)
-  WT_WORKTREE_PATH  Path of the current worktree (empty outside a worktree)
-  WT_WORKTREE_ID    Sanitized branch name (empty outside a worktree)
-  WT_BRANCH_NAME    Branch of the current worktree (empty outside a worktree)
+  WT_SCRIPT_NAME         Name of the script being run
+  WT_PROJECT_ROOT        Project root (where .worktree.yml lives)
+  WT_SHARED_PATH         Shared directory (copy/ and symlink/)
+  WT_MAIN_BRANCH         main_branch from .worktree.yml
+  WT_MAIN_WORKTREE_PATH  Worktree checked out on the main branch (empty if none)
+  WT_WORKTREE_PATH       Path of the current worktree (empty outside a worktree)
+  WT_WORKTREE_ID         Sanitized branch name (empty outside a worktree)
+  WT_BRANCH_NAME         Branch of the current worktree (empty outside a worktree)
 
 Arguments after the script name are passed through to the script verbatim.
 Because of this, wt flags must come before the script name:
@@ -77,7 +80,7 @@ func runRun(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	dir, vars, err := resolveScriptContext(cmd, projectRoot, cfg)
+	sc, err := resolveScriptContext(cmd, projectRoot, cfg)
 	if err != nil {
 		return err
 	}
@@ -85,11 +88,14 @@ func runRun(cmd *cobra.Command, args []string) error {
 	ui.Step(fmt.Sprintf("Running %s: %s", name, displayScriptPath(projectRoot, scriptPath)))
 
 	if err := project.RunScript(ctx, project.ScriptRun{
-		Name: name,
-		Path: scriptPath,
-		Args: scriptArgs,
-		Dir:  dir,
-		Vars: vars,
+		Name:             name,
+		Path:             scriptPath,
+		Args:             scriptArgs,
+		Dir:              sc.dir,
+		Vars:             sc.vars,
+		SharedPath:       project.SharedPath(projectRoot, cfg),
+		MainBranch:       cfg.MainBranch,
+		MainWorktreePath: sc.mainWorktreePath,
 	}, IsDryRun()); err != nil {
 		return err
 	}
@@ -100,14 +106,22 @@ func runRun(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
+// scriptContext is where a script runs and what it learns about the project.
+type scriptContext struct {
+	dir              string
+	vars             project.TemplateVars
+	mainWorktreePath string
+}
+
 // resolveScriptContext picks the working directory and template vars for a
 // script run. Inside a managed worktree the script runs there with the
 // worktree's branch exported; anywhere else it runs in the current directory
-// with only the project root set.
-func resolveScriptContext(cmd *cobra.Command, projectRoot string, cfg *config.Config) (string, project.TemplateVars, error) {
+// with only the project root set. It also locates the main branch's worktree
+// so scripts can act on it regardless of where they were invoked.
+func resolveScriptContext(cmd *cobra.Command, projectRoot string, cfg *config.Config) (scriptContext, error) {
 	cwd, err := os.Getwd()
 	if err != nil {
-		return "", project.TemplateVars{}, err
+		return scriptContext{}, err
 	}
 
 	// Read-only lookup: use a non-dry runner so --dry-run still resolves
@@ -115,14 +129,38 @@ func resolveScriptContext(cmd *cobra.Command, projectRoot string, cfg *config.Co
 	runner := git.NewRunner(project.GitDirPath(projectRoot, cfg), false)
 	worktrees, err := runner.WorktreeList(cmd.Context())
 	if err != nil {
-		return "", project.TemplateVars{}, err
+		return scriptContext{}, err
 	}
+	filtered := filterManagedWorktrees(worktrees, projectRoot)
 
-	if wt, ok := resolveCurrentWorktree(filterManagedWorktrees(worktrees, projectRoot)); ok {
-		return wt.Path, project.NewTemplateVars(projectRoot, wt.Path, wt.Branch), nil
+	sc := scriptContext{
+		dir:              cwd,
+		vars:             project.TemplateVars{ProjectRoot: filepath.Clean(projectRoot)},
+		mainWorktreePath: resolveMainWorktreePath(worktrees, filtered, cfg),
 	}
+	if wt, ok := resolveCurrentWorktree(filtered); ok {
+		sc.dir = wt.Path
+		sc.vars = project.NewTemplateVars(projectRoot, wt.Path, wt.Branch)
+	}
+	return sc, nil
+}
 
-	return cwd, project.TemplateVars{ProjectRoot: filepath.Clean(projectRoot)}, nil
+// resolveMainWorktreePath finds the worktree checked out on cfg.MainBranch.
+// For wt init projects the main worktree is the project root itself, which
+// filterManagedWorktrees excludes, so fall back to the unfiltered list.
+func resolveMainWorktreePath(all, filtered []git.WorktreeInfo, cfg *config.Config) string {
+	if cfg.MainBranch == "" {
+		return ""
+	}
+	if wt, ok := findWorktreeByBranch(filtered, cfg.MainBranch); ok {
+		return wt.Path
+	}
+	for _, wt := range all {
+		if !wt.Bare && wt.Branch == cfg.MainBranch {
+			return wt.Path
+		}
+	}
+	return ""
 }
 
 func completeScriptNames(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {

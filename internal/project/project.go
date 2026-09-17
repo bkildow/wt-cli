@@ -30,6 +30,7 @@ func CreateScaffold(projectRoot string, cfg *config.Config, dryRun bool) error {
 		filepath.Join(SharedPath(projectRoot, cfg), "copy"),
 		filepath.Join(SharedPath(projectRoot, cfg), "symlink"),
 		WorktreesPath(projectRoot, cfg),
+		BinPath(projectRoot, cfg),
 	}
 
 	for _, dir := range dirs {
@@ -69,4 +70,11 @@ func WorktreesPath(projectRoot string, cfg *config.Config) string {
 
 func SharedPath(projectRoot string, cfg *config.Config) string {
 	return filepath.Join(projectRoot, cfg.SharedDir)
+}
+
+// BinPath is the directory for project-level scripts run via `wt run`. It is
+// a sibling of the shared directory: bin/ for cloned projects and
+// .worktrees/bin/ for initialized ones.
+func BinPath(projectRoot string, cfg *config.Config) string {
+	return filepath.Join(filepath.Dir(SharedPath(projectRoot, cfg)), "bin")
 }

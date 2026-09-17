@@ -38,6 +38,8 @@ After wt clone (bare repo):
     project/
       .bare/              # Bare git repository (no .git at root)
       .worktree.yml       # Project configuration
+      bin/
+        refresh           # Starter script for 'wt run refresh' (a commented no-op)
       shared/
         copy/             # Files copied into each new worktree
         symlink/          # Directories symlinked into each new worktree
@@ -51,6 +53,8 @@ After wt init (existing repo):
       .git/               # Existing git directory (project root is the main worktree)
       .worktree.yml       # Project configuration
       .worktrees/
+        bin/
+          refresh         # Starter script for 'wt run refresh' (a commented no-op)
         shared/
           copy/           # Files copied into each new worktree
           symlink/        # Directories symlinked into each new worktree
@@ -92,6 +96,11 @@ After wt init (existing repo):
 
     wt run <name> [args...]           # Runs scripts.<name> from .worktree.yml in the current worktree
     wt run --dry-run <name>           # wt flags must precede the name; later args go to the script
+
+bin/refresh is a generated stub. When asked to set up an environment refresh,
+read it and implement the commented steps for this project's stack. Scripts
+receive WT_PROJECT_ROOT, WT_SHARED_PATH, WT_MAIN_BRANCH, WT_MAIN_WORKTREE_PATH,
+WT_WORKTREE_PATH, WT_BRANCH_NAME, WT_WORKTREE_ID, and WT_SCRIPT_NAME.
 
 ### Apply shared files
 

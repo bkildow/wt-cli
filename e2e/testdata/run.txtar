@@ -29,6 +29,9 @@ exec wt run probe --flag
 exists $WORK/project/worktrees/main/probe-out.txt
 grep 'branch=main' $WORK/project/worktrees/main/probe-out.txt
 grep 'wtpath='$WORK'/project/worktrees/main' $WORK/project/worktrees/main/probe-out.txt
+grep 'shared='$WORK'/project/shared' $WORK/project/worktrees/main/probe-out.txt
+grep 'mainbranch=main' $WORK/project/worktrees/main/probe-out.txt
+grep 'mainpath='$WORK'/project/worktrees/main' $WORK/project/worktrees/main/probe-out.txt
 grep 'args=--flag' $WORK/project/worktrees/main/probe-out.txt
 ! exists $WORK/project/probe-out.txt
 rm $WORK/project/worktrees/main/probe-out.txt
@@ -60,6 +63,7 @@ version: 1
 git_dir: .bare
 worktree_dir: worktrees
 shared_dir: shared
+main_branch: main
 scripts:
   probe: bin/probe
   noexec: bin/noexec
@@ -77,6 +81,9 @@ shared_dir: shared
   echo "root=$WT_PROJECT_ROOT"
   echo "wtpath=$WT_WORKTREE_PATH"
   echo "branch=$WT_BRANCH_NAME"
+  echo "shared=$WT_SHARED_PATH"
+  echo "mainbranch=$WT_MAIN_BRANCH"
+  echo "mainpath=$WT_MAIN_WORKTREE_PATH"
   echo "args=$*"
 } > probe-out.txt
 -- fail.sh --
