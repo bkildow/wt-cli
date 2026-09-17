@@ -95,6 +95,7 @@ wt prune
 | `wt list` | List all worktrees |
 | `wt remove [name]` | Remove a worktree and its branch |
 | `wt setup [name]` | Run setup hooks on an existing worktree |
+| `wt run [name] [args...]` | Run a named project script from any worktree |
 | `wt cd [name]` | Print worktree path for shell navigation |
 | `wt root` | Print project root path for shell navigation |
 | `wt apply [name]` | Apply shared files to a worktree |
@@ -160,6 +161,34 @@ existing worktree. The primary use case is bootstrapping a worktree that was
 created with `wt add --skip-setup`, but it can also be used to re-run hooks
 after editing `.worktree.yml`. Refuses to run when a setup is already in
 progress for the target worktree (check with `wt status`).
+
+### wt run
+
+```bash
+wt run refresh               # Run the script named "refresh"
+wt run refresh --no-cache    # Everything after the name is passed to the script
+wt run                       # Interactive picker
+wt run --dry-run refresh     # Show what would run (wt flags go before the name)
+```
+
+Runs a script from the `scripts:` map in `.worktree.yml`. Paths are resolved
+relative to the project root, so a `bin/refresh-snapshot` that rebuilds your
+local environment can be run identically from inside any worktree without
+hunting for it. The script must exist and be executable.
+
+The script's working directory is the worktree containing `$PWD`, or the
+current directory when run from outside a worktree. These environment
+variables are exported:
+
+| Variable | Value |
+|----------|-------|
+| `WT_SCRIPT_NAME` | Name of the script being run |
+| `WT_PROJECT_ROOT` | Absolute project root |
+| `WT_WORKTREE_PATH` | Absolute path of the current worktree (empty outside a worktree) |
+| `WT_WORKTREE_ID` | Branch lowercased, `/` → `-` (empty outside a worktree) |
+| `WT_BRANCH_NAME` | Branch of the current worktree (empty outside a worktree) |
+
+A non-zero exit from the script is reported as an error.
 
 ### wt cd
 
@@ -304,6 +333,9 @@ teardown:
 parallel_teardown:
   - "make clean"
   - "rm -rf tmp/"
+scripts:
+  refresh: bin/refresh-snapshot
+  seed: bin/seed
 ```
 
 | Field | Description | Default |
@@ -316,6 +348,7 @@ parallel_teardown:
 | `parallel_setup` | Commands to run concurrently after serial setup hooks | `[]` |
 | `teardown` | Commands to run sequentially before removing a worktree | `[]` |
 | `parallel_teardown` | Commands to run concurrently after serial teardown hooks | `[]` |
+| `scripts` | Named executables (relative to project root) for `wt run <name>` | `{}` |
 | `disk_warn` | Warn when free disk space is low (`false` disables) | `true` |
 | `disk_warn_percent` | Warn below this percentage of free space (`-1` disables this bound) | `10` |
 | `disk_warn_gb` | Warn below this many GB of free space (`-1` disables this bound) | `10` |

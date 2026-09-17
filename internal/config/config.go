@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/bkildow/wt-cli/internal/disk"
@@ -37,6 +38,10 @@ type Config struct {
 	ParallelTeardown []string `yaml:"parallel_teardown,omitempty"`
 	BackgroundSetup  bool     `yaml:"background_setup,omitempty"`
 	Editor           string   `yaml:"editor,omitempty"`
+
+	// Scripts maps a name to an executable path (relative to the project
+	// root, or absolute) run via `wt run <name>`.
+	Scripts map[string]string `yaml:"scripts,omitempty"`
 
 	// DiskWarn gates the low-disk-space warning. It is a pointer because the
 	// warning defaults to on, so the zero value cannot mean "disabled".
@@ -250,6 +255,24 @@ func renderAnnotatedConfig(cfg *Config) string {
 		b.WriteString("# parallel_teardown:\n")
 		b.WriteString("#   - docker compose down\n")
 		b.WriteString("#   - make clean\n")
+	}
+
+	b.WriteString("\n# Named scripts run via 'wt run <name>' from any worktree\n")
+	b.WriteString("# Paths are executables resolved relative to the project root\n")
+	if cfg != nil && len(cfg.Scripts) > 0 {
+		b.WriteString("scripts:\n")
+		names := make([]string, 0, len(cfg.Scripts))
+		for name := range cfg.Scripts {
+			names = append(names, name)
+		}
+		sort.Strings(names)
+		for _, name := range names {
+			fmt.Fprintf(&b, "  %s: %s\n", yamlQuote(name), yamlQuote(cfg.Scripts[name]))
+		}
+	} else {
+		b.WriteString("# scripts:\n")
+		b.WriteString("#   refresh: bin/refresh-snapshot\n")
+		b.WriteString("#   seed: bin/seed\n")
 	}
 
 	return b.String()

@@ -1,0 +1,156 @@
+package cmd
+
+import (
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+
+	"github.com/bkildow/wt-cli/internal/config"
+	"github.com/bkildow/wt-cli/internal/git"
+	"github.com/bkildow/wt-cli/internal/project"
+	"github.com/bkildow/wt-cli/internal/ui"
+	"github.com/spf13/cobra"
+)
+
+func newRunCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "run [name] [args...]",
+		Short: "Run a named project script from .worktree.yml",
+		Long: `Runs a script configured under the "scripts" key of .worktree.yml.
+
+Script paths are resolved relative to the project root (absolute paths are
+allowed). The script runs with the current worktree as its working directory
+and receives these environment variables:
+
+  WT_SCRIPT_NAME    Name of the script being run
+  WT_PROJECT_ROOT   Project root (where .worktree.yml lives)
+  WT_WORKTREE_PATH  Path of the current worktree (empty outside a worktree)
+  WT_WORKTREE_ID    Sanitized branch name (empty outside a worktree)
+  WT_BRANCH_NAME    Branch of the current worktree (empty outside a worktree)
+
+Arguments after the script name are passed through to the script verbatim.
+Because of this, wt flags must come before the script name:
+
+  wt run refresh --no-cache        # --no-cache is passed to the script
+  wt run --dry-run refresh         # dry-run applies to wt
+
+With no name, an interactive picker lists the configured scripts.`,
+		Args:              cobra.ArbitraryArgs,
+		ValidArgsFunction: completeScriptNames,
+		RunE:              runRun,
+	}
+	cmd.Flags().SetInterspersed(false)
+	return cmd
+}
+
+func runRun(cmd *cobra.Command, args []string) error {
+	ctx := cmd.Context()
+
+	projectRoot, cfg, err := loadProject()
+	if err != nil {
+		return err
+	}
+
+	if len(cfg.Scripts) == 0 {
+		ui.Info("No scripts configured in .worktree.yml")
+		return nil
+	}
+
+	var name string
+	var scriptArgs []string
+	if len(args) > 0 {
+		name, scriptArgs = args[0], args[1:]
+	} else {
+		prompter := &ui.InteractivePrompter{}
+		name, err = prompter.SelectScript(project.ScriptNames(cfg))
+		if err != nil {
+			if ui.IsUserAbort(err) {
+				return nil
+			}
+			return err
+		}
+	}
+
+	scriptPath, err := project.ResolveScript(cfg, projectRoot, name)
+	if err != nil {
+		return err
+	}
+
+	dir, vars, err := resolveScriptContext(cmd, projectRoot, cfg)
+	if err != nil {
+		return err
+	}
+
+	ui.Step(fmt.Sprintf("Running %s: %s", name, displayScriptPath(projectRoot, scriptPath)))
+
+	if err := project.RunScript(ctx, project.ScriptRun{
+		Name: name,
+		Path: scriptPath,
+		Args: scriptArgs,
+		Dir:  dir,
+		Vars: vars,
+	}, IsDryRun()); err != nil {
+		return err
+	}
+
+	if !IsDryRun() {
+		ui.Success("Completed: " + name)
+	}
+	return nil
+}
+
+// resolveScriptContext picks the working directory and template vars for a
+// script run. Inside a managed worktree the script runs there with the
+// worktree's branch exported; anywhere else it runs in the current directory
+// with only the project root set.
+func resolveScriptContext(cmd *cobra.Command, projectRoot string, cfg *config.Config) (string, project.TemplateVars, error) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return "", project.TemplateVars{}, err
+	}
+
+	// Read-only lookup: use a non-dry runner so --dry-run still resolves
+	// the real worktree.
+	runner := git.NewRunner(project.GitDirPath(projectRoot, cfg), false)
+	worktrees, err := runner.WorktreeList(cmd.Context())
+	if err != nil {
+		return "", project.TemplateVars{}, err
+	}
+
+	if wt, ok := resolveCurrentWorktree(filterManagedWorktrees(worktrees, projectRoot)); ok {
+		return wt.Path, project.NewTemplateVars(projectRoot, wt.Path, wt.Branch), nil
+	}
+
+	return cwd, project.TemplateVars{ProjectRoot: filepath.Clean(projectRoot)}, nil
+}
+
+func completeScriptNames(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	if len(args) != 0 {
+		return nil, cobra.ShellCompDirectiveDefault
+	}
+
+	cwd, err := os.Getwd()
+	if err != nil {
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	}
+	projectRoot, err := project.FindRoot(cwd)
+	if err != nil {
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	}
+	cfg, err := config.Load(projectRoot)
+	if err != nil {
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	}
+	return project.ScriptNames(cfg), cobra.ShellCompDirectiveNoFileComp
+}
+
+// displayScriptPath shows scripts under the project root as a relative path
+// and everything else as-is.
+func displayScriptPath(projectRoot, scriptPath string) string {
+	rel, err := filepath.Rel(projectRoot, scriptPath)
+	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return scriptPath
+	}
+	return rel
+}

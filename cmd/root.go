@@ -51,6 +51,7 @@ func init() {
 	rootCmd.AddCommand(newListCmd())
 	rootCmd.AddCommand(newRemoveCmd())
 	rootCmd.AddCommand(newSetupCmd())
+	rootCmd.AddCommand(newRunCmd())
 	rootCmd.AddCommand(newCdCmd())
 	rootCmd.AddCommand(newApplyCmd())
 	rootCmd.AddCommand(newConfigCmd())

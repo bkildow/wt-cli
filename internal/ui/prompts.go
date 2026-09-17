@@ -11,6 +11,7 @@ type Prompter interface {
 	SelectBranch(branches []string) (string, error)
 	SelectWorktree(worktrees []string) (string, error)
 	SelectEditor(editors []string) (string, error)
+	SelectScript(scripts []string) (string, error)
 	Confirm(title string) (bool, error)
 	InputString(title, placeholder string) (string, error)
 }
@@ -74,6 +75,10 @@ func (p *InteractivePrompter) SelectWorktree(worktrees []string) (string, error)
 
 func (p *InteractivePrompter) SelectEditor(editors []string) (string, error) {
 	return selectFromStrings("Select an editor", editors)
+}
+
+func (p *InteractivePrompter) SelectScript(scripts []string) (string, error) {
+	return selectFromStrings("Select a script", scripts)
 }
 
 func (p *InteractivePrompter) Confirm(title string) (bool, error) {

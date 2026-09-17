@@ -25,6 +25,9 @@ teardown:
 parallel_teardown:
   - make clean
 editor: cursor
+scripts:
+  refresh: bin/refresh-snapshot
+  seed: /opt/tools/seed
 `
 	if err := os.WriteFile(filepath.Join(dir, ConfigFileName), []byte(content), 0o644); err != nil {
 		t.Fatal(err)
@@ -33,6 +36,10 @@ editor: cursor
 	cfg, err := Load(dir)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(cfg.Scripts) != 2 || cfg.Scripts["refresh"] != "bin/refresh-snapshot" || cfg.Scripts["seed"] != "/opt/tools/seed" {
+		t.Errorf("scripts = %v, want refresh and seed entries", cfg.Scripts)
 	}
 
 	if cfg.Version != 1 {
@@ -253,6 +260,7 @@ func TestWriteAnnotatedWithValues(t *testing.T) {
 		Setup:       []string{"npm install", "cp .env.example .env"},
 		Teardown:    []string{"docker compose down"},
 		Editor:      "cursor",
+		Scripts:     map[string]string{"seed": "bin/seed", "refresh": "bin/refresh:snapshot", "db:reset": "bin/db-reset"},
 	}
 
 	if err := WriteAnnotatedWithValues(dir, existing); err != nil {
@@ -296,6 +304,14 @@ func TestWriteAnnotatedWithValues(t *testing.T) {
 		t.Error("missing worktree_dir custom value")
 	}
 
+	// Scripts should be uncommented, sorted by name, with values quoted as needed
+	if !strings.Contains(content, "scripts:\n  \"db:reset\": bin/db-reset\n  refresh: \"bin/refresh:snapshot\"\n  seed: bin/seed\n") {
+		t.Errorf("scripts block not rendered as expected:\n%s", content)
+	}
+	if strings.Contains(content, "# scripts:") {
+		t.Error("scripts should not be commented out when values exist")
+	}
+
 	// Should be loadable and round-trip correctly
 	cfg, err := Load(dir)
 	if err != nil {
@@ -315,6 +331,9 @@ func TestWriteAnnotatedWithValues(t *testing.T) {
 	}
 	if len(cfg.Teardown) != 1 || cfg.Teardown[0] != "docker compose down" {
 		t.Errorf("teardown = %v, want [docker compose down]", cfg.Teardown)
+	}
+	if cfg.Scripts["db:reset"] != "bin/db-reset" || cfg.Scripts["refresh"] != "bin/refresh:snapshot" {
+		t.Errorf("scripts did not round-trip: %v", cfg.Scripts)
 	}
 }
 
