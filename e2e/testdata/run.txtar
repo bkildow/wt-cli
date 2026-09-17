@@ -1,0 +1,84 @@
+[!exec:git] skip 'git not available'
+
+setup-repo develop
+setup-project
+
+cd $WORK/project
+
+cp $WORK/with-scripts.yml .worktree.yml
+mkdir bin
+cp $WORK/probe.sh bin/probe
+chmod 755 bin/probe
+cp $WORK/probe.sh bin/noexec
+
+exec wt add --skip-setup main
+exists worktrees/main
+
+# From the project root: runs in cwd, worktree vars are empty.
+exec wt run probe one two
+exists probe-out.txt
+grep 'name=probe' probe-out.txt
+grep 'root='$WORK'/project' probe-out.txt
+grep 'branch=$' probe-out.txt
+grep 'args=one two' probe-out.txt
+rm probe-out.txt
+
+# From inside a worktree: cwd and env come from that worktree.
+cd $WORK/project/worktrees/main
+exec wt run probe --flag
+exists $WORK/project/worktrees/main/probe-out.txt
+grep 'branch=main' $WORK/project/worktrees/main/probe-out.txt
+grep 'wtpath='$WORK'/project/worktrees/main' $WORK/project/worktrees/main/probe-out.txt
+grep 'args=--flag' $WORK/project/worktrees/main/probe-out.txt
+! exists $WORK/project/probe-out.txt
+rm $WORK/project/worktrees/main/probe-out.txt
+cd $WORK/project
+
+# Dry run resolves but does not execute.
+exec wt run --dry-run probe
+! exists probe-out.txt
+
+# Unknown, missing, and non-executable scripts fail (shim drops messages; check exit code).
+! exec wt run nope
+! exec wt run missing
+! exec wt run noexec
+
+# Exit code propagates.
+cp $WORK/fail.sh bin/fail
+chmod 755 bin/fail
+! exec wt run fail
+
+cp $WORK/no-scripts.yml .worktree.yml
+exec wt run probe
+stderr 'No scripts configured'
+
+exec wt run --help
+stdout 'Runs a script configured under the "scripts" key'
+
+-- with-scripts.yml --
+version: 1
+git_dir: .bare
+worktree_dir: worktrees
+shared_dir: shared
+scripts:
+  probe: bin/probe
+  noexec: bin/noexec
+  missing: bin/missing
+  fail: bin/fail
+-- no-scripts.yml --
+version: 1
+git_dir: .bare
+worktree_dir: worktrees
+shared_dir: shared
+-- probe.sh --
+#!/bin/sh
+{
+  echo "name=$WT_SCRIPT_NAME"
+  echo "root=$WT_PROJECT_ROOT"
+  echo "wtpath=$WT_WORKTREE_PATH"
+  echo "branch=$WT_BRANCH_NAME"
+  echo "args=$*"
+} > probe-out.txt
+-- fail.sh --
+#!/bin/sh
+exit 3

@@ -88,6 +88,11 @@ After wt init (existing repo):
 
     cd "$(wt cd <name>)"              # Use shell substitution to cd
 
+### Run a project script
+
+    wt run <name> [args...]           # Runs scripts.<name> from .worktree.yml in the current worktree
+    wt run --dry-run <name>           # wt flags must precede the name; later args go to the script
+
 ### Apply shared files
 
     wt apply <name>                   # Apply to one worktree
